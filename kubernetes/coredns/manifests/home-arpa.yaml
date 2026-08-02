@@ -7,5 +7,5 @@ data:
     home.arpa:53 {
       errors
       cache 30
-      forward . 192.168.1.28:53
+      forward . 192.168.1.28:5353
     }
