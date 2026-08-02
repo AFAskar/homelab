@@ -5,4 +5,5 @@ resources:
   - argocd/argocd.yaml
   - coredns/coredns.yaml
   - externalService/externalService.yaml
+  - monitoring/monitoring.yaml
   - traefik/traefik.yaml
