@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/AFAskar/homelab.git
     targetRevision: main
-    path: kubernetes/externalService/manifests
+    path: kubernetes/coredns/manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
