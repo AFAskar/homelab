@@ -3,5 +3,6 @@ kind: Kustomization
 
 resources:
   - argocd/argocd.yaml
+  - coredns/coredns.yaml
   - externalService/externalService.yaml
   - traefik/traefik.yaml
