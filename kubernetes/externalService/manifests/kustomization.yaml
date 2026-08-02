@@ -4,5 +4,4 @@ kind: Kustomization
 namespace: infra
 
 resources:
-  - adguard-service.yaml
-  - adguard-endpoint.yaml
+  - adguard.yaml
