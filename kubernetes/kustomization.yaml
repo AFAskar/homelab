@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - argocd/argocd.yaml
   - externalService/externalService.yaml
+  - traefik/traefik.yaml
