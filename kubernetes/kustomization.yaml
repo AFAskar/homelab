@@ -8,3 +8,4 @@ resources:
   - monitoring/monitoring.yaml
   - traefik/traefik.yaml
   - cert-manager/cert-manager.yaml
+  - cert-manager/cert-manager-conf.yaml
