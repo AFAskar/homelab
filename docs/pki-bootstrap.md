@@ -187,20 +187,19 @@ devices. Do not install the Kubernetes intermediate as a trust anchor. Traefik
 serves the intermediate with its leaf certificate so clients can build the
 chain back to the trusted root.
 
-The wildcard `Certificate` sets `CN=home.arpa` and `O=Homelab` for clients that
-do not handle an empty subject consistently. Hostname validation still uses the
-Subject Alternative Name extension. Chromium treats `home.arpa` as a registry
-boundary and does not accept `*.home.arpa` for its immediate subdomains, so
-each ingress hostname must also be listed explicitly in `dnsNames`.
+The wildcard `Certificate` sets `CN=*.home.internal` and `O=Homelab` for clients
+that do not handle an empty subject consistently. Hostname validation still
+uses the Subject Alternative Name extension, which contains `*.home.internal`
+and `home.internal`.
 
 After Argo CD applies the `Certificate` resource, verify the certificate served
 by Traefik:
 
 ```sh
 openssl s_client \
-  -connect argocd.home.arpa:443 \
-  -servername argocd.home.arpa \
-  -verify_hostname argocd.home.arpa \
+  -connect argocd.home.internal:443 \
+  -servername argocd.home.internal \
+  -verify_hostname argocd.home.internal \
   -verify_return_error \
   </dev/null
 ```

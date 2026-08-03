@@ -4,7 +4,7 @@ metadata:
   name: adguard-ui
 spec:
   type: ExternalName
-  externalName: pos.home.arpa
+  externalName: pos.home.internal
   ports:
     - name: http
       protocol: TCP
@@ -19,9 +19,9 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - dns.home.arpa
+        - dns.home.internal
   rules:
-    - host: dns.home.arpa
+    - host: dns.home.internal
       http:
         paths:
           - path: /

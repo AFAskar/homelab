@@ -4,4 +4,4 @@ kind: Kustomization
 namespace: kube-system
 
 resources:
-  - home-arpa.yaml
+  - home-internal.yaml

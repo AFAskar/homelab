@@ -1,13 +1,13 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: home-arpa-wildcard
+  name: home-internal-wildcard
   namespace: kube-system
 spec:
-  secretName: home-arpa-wildcard-tls
+  secretName: home-internal-wildcard-tls
   duration: 2160h
   renewBefore: 360h
-  commonName: home.arpa
+  commonName: "*.home.internal"
   subject:
     organizations:
       - Homelab
@@ -18,9 +18,8 @@ spec:
     - digital signature
     - server auth
   dnsNames:
-    - "*.home.arpa"
-    - home.arpa
-    - "argocd.home.arpa"
+    - "*.home.internal"
+    - home.internal
 
   privateKey:
     algorithm: ECDSA

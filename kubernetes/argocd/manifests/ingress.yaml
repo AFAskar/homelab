@@ -7,9 +7,9 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - argocd.home.arpa
+        - argocd.home.internal
   rules:
-    - host: argocd.home.arpa
+    - host: argocd.home.internal
       http:
         paths:
           - path: /

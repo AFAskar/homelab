@@ -34,10 +34,10 @@ spec:
             enabled: true
             ingressClassName: traefik
             hosts:
-              - grafana.home.arpa
+              - grafana.home.internal
             tls:
               - hosts:
-                  - grafana.home.arpa
+                  - grafana.home.internal
             path: /
             pathType: Prefix
           persistence:
