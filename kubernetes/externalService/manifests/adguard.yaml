@@ -17,6 +17,9 @@ metadata:
   name: adguard-ui
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - dns.home.arpa
   rules:
     - host: dns.home.arpa
       http:
