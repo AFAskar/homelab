@@ -7,3 +7,4 @@ resources:
   - externalService/externalService.yaml
   - monitoring/monitoring.yaml
   - traefik/traefik.yaml
+  - cert-manager/cert-manager.yaml
