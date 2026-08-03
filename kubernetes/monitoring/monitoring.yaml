@@ -35,6 +35,9 @@ spec:
             ingressClassName: traefik
             hosts:
               - grafana.home.arpa
+            tls:
+              - hosts:
+                  - grafana.home.arpa
             path: /
             pathType: Prefix
           persistence:
