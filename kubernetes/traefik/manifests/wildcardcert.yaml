@@ -20,6 +20,7 @@ spec:
   dnsNames:
     - "*.home.arpa"
     - home.arpa
+    - "argocd.home.arpa"
 
   privateKey:
     algorithm: ECDSA
