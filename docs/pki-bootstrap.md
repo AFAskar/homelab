@@ -179,3 +179,30 @@ pass insert -m homelab/pki/kubernetes-intermediate-key \
 
 Do not remove the working key until the SOPS-encrypted Kubernetes Secret has
 been created, decrypted, and verified against the intermediate certificate.
+
+## Browser Trust
+
+Install `pki/homelab-root-ca.crt` as a trusted certificate authority on client
+devices. Do not install the Kubernetes intermediate as a trust anchor. Traefik
+serves the intermediate with its leaf certificate so clients can build the
+chain back to the trusted root.
+
+The wildcard `Certificate` sets `CN=*.home.arpa` and `O=Homelab` for clients
+that do not handle an empty subject consistently. Hostname validation still
+uses the Subject Alternative Name extension, which contains `*.home.arpa` and
+`home.arpa`.
+
+After Argo CD applies the `Certificate` resource, verify the certificate served
+by Traefik:
+
+```sh
+openssl s_client \
+  -connect argocd.home.arpa:443 \
+  -servername argocd.home.arpa \
+  -verify_hostname argocd.home.arpa \
+  -verify_return_error \
+  </dev/null
+```
+
+The output should include `Verification: OK`, `Verified peername:
+*.home.arpa`, and `Verify return code: 0 (ok)`.

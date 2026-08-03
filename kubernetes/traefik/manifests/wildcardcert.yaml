@@ -7,6 +7,10 @@ spec:
   secretName: home-arpa-wildcard-tls
   duration: 2160h
   renewBefore: 360h
+  commonName: "*.home.arpa"
+  subject:
+    organizations:
+      - Homelab
   issuerRef:
     name: homelab-ca
     kind: ClusterIssuer
