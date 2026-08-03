@@ -5,3 +5,5 @@ namespace: kube-system
 
 resources:
   - helm-config.yaml
+  - wildcardcert.yaml
+  - tlsstore.yaml
