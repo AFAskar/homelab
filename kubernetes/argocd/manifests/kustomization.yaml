@@ -5,6 +5,8 @@ namespace: argocd
 
 resources:
   - https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.6/manifests/install.yaml
+  - ingress.yaml
 patches:
   - path: argocd-cm.yaml
   - path: argocd-ksops-patch.yaml
+  - path: argocd-cmd-params-cm.yaml
