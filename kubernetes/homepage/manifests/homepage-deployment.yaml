@@ -81,7 +81,8 @@ spec:
             - mountPath: /app/config/logs
               name: logs
             - mountPath: /app/config/proxmox.yaml
-              name: proxmox.yaml
+              name: homepage-config
+              subPath: proxmox.yaml
       volumes:
         - name: homepage-config
           configMap:
