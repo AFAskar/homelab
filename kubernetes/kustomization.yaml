@@ -9,3 +9,4 @@ resources:
   - traefik/traefik.yaml
   - cert-manager/cert-manager.yaml
   - cert-manager/cert-manager-conf.yaml
+  - homepage/homepage.yaml
