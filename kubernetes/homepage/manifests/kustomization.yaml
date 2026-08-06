@@ -8,3 +8,9 @@ resources:
   - homepage-cm.yaml
   - homepage-ingress.yaml
   - ServiceAccount.yaml
+
+patches:
+  - path: adguard-integration.yaml
+
+generators:
+  - ksops-generator.yaml

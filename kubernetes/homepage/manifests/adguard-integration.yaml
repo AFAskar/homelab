@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage
+data:
+  services.yaml: |
+    - Cluster Management:
+      - AdGuard Home:
+          icon: adguard-home
+          href: https://dns.home.internal
+          description: AdGuard Home UI
+          widget:
+            type: adguard
+            url:  http://adguard-ui.infra.svc.cluster.local:3000
+            username: "{{HOMEPAGE_VAR_ADGUARD_USERNAME}}"
+            password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"

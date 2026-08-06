@@ -15,12 +15,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: adguard-ui
-  annotations:
-    gethomepage.dev/description: AdGuard Home UI
-    gethomepage.dev/enabled: "true"
-    gethomepage.dev/group: Cluster Management
-    gethomepage.dev/icon: adguard-home
-    gethomepage.dev/name: AdGuard Home
+
 spec:
   ingressClassName: traefik
   tls:
