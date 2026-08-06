@@ -33,6 +33,13 @@ spec:
           ingress:
             enabled: true
             ingressClassName: traefik
+            annotations:
+              gethomepage.dev/description: Metrics Dashboards
+              gethomepage.dev/enabled: "true"
+              gethomepage.dev/group: Cluster Management
+              gethomepage.dev/icon: grafana
+              gethomepage.dev/name: Grafana
+
             hosts:
               - grafana.home.internal
             tls:

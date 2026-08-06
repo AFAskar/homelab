@@ -2,6 +2,12 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: argocd-server
+  annotations:
+    gethomepage.dev/description: GitOps Provider
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: Cluster Management
+    gethomepage.dev/icon: argo-cd
+    gethomepage.dev/name: ArgoCD
 spec:
   ingressClassName: traefik
   tls:
