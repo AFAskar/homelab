@@ -80,6 +80,8 @@ spec:
               subPath: widgets.yaml
             - mountPath: /app/config/logs
               name: logs
+            - mountPath: /app/config/proxmox.yaml
+              name: proxmox.yaml
       volumes:
         - name: homepage-config
           configMap:

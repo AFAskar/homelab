@@ -13,6 +13,7 @@ data:
   custom.js: ""
   bookmarks.yaml: ""
   services.yaml: ""
+  proxmox.yaml: ""
   widgets.yaml: |
     - kubernetes:
         cluster:
