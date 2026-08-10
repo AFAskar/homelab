@@ -23,3 +23,8 @@ spec:
                 secretKeyRef:
                   name: homepage-argocd
                   key: token
+            - name: HOMEPAGE_VAR_GRAFANA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: homepage-grafana
+                  key: password
