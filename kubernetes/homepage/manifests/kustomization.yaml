@@ -11,6 +11,7 @@ resources:
 
 patches:
   - path: adguard-integration.yaml
+  - path: homepage-integrations-env.yaml
 
 generators:
   - ksops-generator.yaml
