@@ -17,8 +17,3 @@ spec:
       description: Read-only access to resources in the default project
       policies:
         - p, proj:default:ProjectReader, applications, get, default/*, allow
-        - p, proj:default:ProjectReader, applicationsets, get, default/*, allow
-        - p, proj:default:ProjectReader, clusters, get, default/*, allow
-        - p, proj:default:ProjectReader, repositories, get, default/*, allow
-        - p, proj:default:ProjectReader, logs, get, default/*, allow
-        - p, proj:default:ProjectReader, exec, get, default/*, allow

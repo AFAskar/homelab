@@ -53,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: homepage-adguard
                   key: password
+            - name: HOMEPAGE_VAR_ARGOCD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: homepage-argocd
+                  key: token
           ports:
             - name: http
               containerPort: 3000
