@@ -44,7 +44,7 @@ spec:
               gethomepage.dev/widget.url: http://monitoring-grafana.monitoring.svc.cluster.local
               gethomepage.dev/widget.version: "2"
               gethomepage.dev/widget.username: homepage
-              gethomepage.dev/widget.password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+              gethomepage.dev/widget.password: '{{ "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}" }}'
             hosts:
               - grafana.home.internal
             tls:
