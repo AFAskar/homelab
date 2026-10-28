@@ -17,6 +17,7 @@ metadata:
   labels:
     release: monitoring
 spec:
+  serviceDiscoveryRole: EndpointSlice
   jobLabel: app
   selector:
     matchLabels:
