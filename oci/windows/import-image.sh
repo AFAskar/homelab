@@ -36,7 +36,8 @@ if [[ -n $image_id ]]; then
   exit 1
 fi
 objects=$(oci os object list --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --prefix "$object" --all)
-exists=$(python3 -c 'import json,sys; print(any(x["name"]==sys.argv[1] for x in json.load(sys.stdin)["data"]["objects"]))' "$object" <<< "$objects")
+objects=${objects:-'{}'}
+exists=$(python3 -c 'import json,sys; print(any(x["name"]==sys.argv[1] for x in (json.load(sys.stdin).get("data") or [])))' "$object" <<< "$objects")
 if [[ $exists == True ]]; then
   stored_digest=$(oci os object head --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --name "$object" --query '"opc-meta-sha256"' --raw-output)
   [[ $stored_digest == "$digest" ]] || { echo 'Existing object lacks matching SHA256 metadata; inspect it manually.' >&2; exit 2; }
