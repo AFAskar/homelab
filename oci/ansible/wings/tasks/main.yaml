@@ -61,6 +61,7 @@
     src: "{{ homelab_ca_local }}"
     dest: /usr/local/share/ca-certificates/homelab-root-ca.crt
     mode: '0644'
+  register: wings_ca
   notify: Refresh CA trust
 - name: Resolve private Panel callback through the OCI router
   ansible.builtin.lineinfile:
@@ -113,6 +114,13 @@
     dest: /etc/systemd/system/wings.service
     mode: '0644'
   notify: Restart wings
+- name: Restart Wings with refreshed CA roots after its unit is installed # noqa: no-handler
+  # CA trust handlers must flush earlier; this restart must wait for the unit.
+  ansible.builtin.systemd_service:
+    name: wings
+    state: restarted
+    daemon_reload: true
+  when: wings_ca.changed
 - name: Enable Docker and Wings across reboots
   ansible.builtin.systemd_service:
     name: "{{ item }}"
