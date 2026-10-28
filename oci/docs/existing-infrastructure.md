@@ -10,7 +10,7 @@ Discovery used the local checkout, `kubectl`, SSH to `pos`/`optiplex`, Tailscale
 - Root policy `Tenant Admin Policy`: `ALLOW GROUP Administrators to manage all-resources IN TENANCY`. API-user group membership could not be established: `ListGroups` returned HTTP 401 `IdcsConversionError: Client is unauthorized`. Do not infer write permission from the policy's existence.
 - Dynamic-group listing later succeeded with no dynamic groups; identity-domain user/group membership remains unresolved.
 - Compute/network/volume/image/shape/limits and usage-cost reads succeeded. OCI Run Command returned 404 `NotAuthorizedOrNotFound`. Initial Object Storage `GetNamespace` calls returned HTTP 401 `NotAuthenticated`; later reads succeeded with namespace `axh0rk0bydbu`, and explicit bucket lists returned empty for root and Ymir. Subscription/OSP reads established EUR billing and PAYG upgraded account status. Detailed subscription credits/usage-ledger calls returned HTTP 401; actual remaining credit is unverified.
-- Organization subscription start: 2026-10-23, end: 2026-11-21T23:59:59.999Z. This is an observed subscription end field, not proof of the credit expiration contract. Verify promotion details in the Console. No payment/address data is committed.
+- Organization subscription start: 2026-10-23, end: 2026-11-21T23:59:59.999Z. This is an observed subscription end field, not proof of the credit expiration contract. The user later provided Console details confirming €250 total commitment in EUR, with November 21 shown as renewal and End date blank. This does not establish unused credit or promotional expiry. No payment/address data is committed.
 
 ## Compute and storage
 
