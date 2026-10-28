@@ -33,24 +33,26 @@ The state bucket is a bootstrap prerequisite outside this root so it survives in
 
 ## Guest configuration and GitOps
 
-Cloud-init only bootstraps new Ubuntu instances. Run Ansible against actual private addresses after reviewed imports, attached volumes and approved routing:
+Cloud-init only bootstraps new Ubuntu instances. Follow this order after the applicable import/deployment approvals:
 
-```bash
-cd oci/ansible
-ansible-galaxy collection install -r requirements.yaml
-# inventory.example.yaml documents all inputs. Or generate inventory from state:
-python3 ../scripts/render-inventory.py
-ansible-playbook --syntax-check site.yaml
-# Existing Thor first needs the reviewed bootstrap-router.yaml over tailnet SSH.
-# See migration.md: preserve its current listener before private-IP provisioning.
-ansible-playbook site.yaml
-ansible-playbook homelab-routes.yaml
-ansible-playbook tailscale/panel-proxy.yaml
-```
+1. Prepare the existing router inventory before paid nodes exist:
 
-Review the generated inventory before use. Existing Thor data requires `retained_data_reviewed: true`. New blank data disks require explicit `wings_initialize_empty_volume: true` after confirming attachment identity. Private firewall lockdown remains off until private access is verified. No existing data or Docker root is migrated automatically.
+   ```bash
+   cd oci/ansible
+   ansible-galaxy collection install -r requirements.yaml
+   cp inventory.example.yaml inventory.yaml # only if no private inventory exists
+   python3 ../scripts/select-ssh-agent-key.py
+   ```
 
-Panel manifests live at `kubernetes/pelican/`, following the existing repository layout, CA, SOPS recipient, and application-of-applications integration. Its Argo application has **manual sync**. Build with `kustomize build --enable-alpha-plugins --enable-exec kubernetes/pelican/manifests` using the authorized SOPS age key. A generated APP_KEY is already encrypted to the repository recipient; protect its backup. Finish the official `/installer` before node enrollment. Do not expose the installer publicly.
+   Review `thor_bootstrap` in the private inventory. Confirm the administrator can apply `tag:oci-router`, merge the required grants (including router-to-pos TCP/443), and verify recovery access **before tagging Thor**. After the access-change review/approval, set `enable_private_ssh_listener: true` for `thor-bootstrap`, then run `ansible-playbook bootstrap-router.yaml` over its existing tailnet address. Approve advertised subnet routes and verify private SSH; preserve the current tailnet listener.
+2. After paid nodes are provisioned through an approved plan, run `python3 ../scripts/render-inventory.py` to refresh DNS/monitoring targets and create an inventory if absent. It preserves any existing private inventory; reconcile instance addresses manually. Review actual subnet sources and run `ansible-playbook homelab-routes.yaml` to establish Kubernetes pod access.
+3. Manually sync Argo application `pelican`, finish its official `/installer`, create wings-01 through wings-04 in Panel, and save their generated configs at the `wings_config_local` paths in the ignored secrets directory. Complete DNS and issue per-node Wings TLS certificates from the existing homelab CA.
+4. Issue a callback-proxy certificate with SAN `pelican.home.internal`. Put its full chain and private key at `secrets/panel-proxy/tls.crt` and `secrets/panel-proxy/tls.key`, or override `panel_proxy_certificate_local` and `panel_proxy_key_local` in the private inventory. Confirm `homelab_ca_local` points to the existing public root certificate. Run `ansible-playbook tailscale/panel-proxy.yaml`.
+5. Only after those Panel configs/certificates and callback access exist, run `ansible-playbook --syntax-check site.yaml` and `ansible-playbook site.yaml` to provision Wings. Verify enrollment, browser console and game access.
+
+Existing Thor data requires `retained_data_reviewed: true` after backup/review. New blank data disks require explicit `wings_initialize_empty_volume: true` after confirming attachment identity. Private firewall lockdown remains off until private access is verified. No existing data or Docker root is migrated automatically.
+
+Panel manifests live at `kubernetes/pelican/`, following the existing layout, CA, SOPS recipient and application-of-applications integration. Its Argo application has **manual sync**. Build with `kustomize build --enable-alpha-plugins --enable-exec kubernetes/pelican/manifests` using the authorized SOPS age key. The APP_KEY is encrypted to the existing repository recipient; protect its backup. Keep the installer private.
 
 [Operations](docs/operations.md) covers private TLS/DNS, enrollment, backups, monitoring, Windows tooling and recovery. [Architecture](docs/architecture.md) records network flows and ARM limitations. Billable deployment, cleanup and merge require explicit approval; a passing static check is not deployment approval.
 

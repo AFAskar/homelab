@@ -7,6 +7,9 @@ all:
     router_private_ip: 10.10.50.10
     homelab_ca_local: "{{ inventory_dir }}/../../pki/homelab-root-ca.crt"
     panel_private_url: https://pelican.home.internal
+    # Issue this certificate for pelican.home.internal using the existing homelab CA.
+    panel_proxy_certificate_local: "{{ inventory_dir }}/secrets/panel-proxy/tls.crt"
+    panel_proxy_key_local: "{{ inventory_dir }}/secrets/panel-proxy/tls.key"
     docker_ce_version: 5:29.9.2-1~ubuntu.26.04~resolute
     containerd_version: 2.4.2-3~ubuntu.26.04~resolute
     wings_config_local: "{{ inventory_dir }}/secrets/{{ inventory_hostname }}/config.yml"
