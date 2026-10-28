@@ -6,7 +6,28 @@ These are procedures to run after prerequisites/approval; they are not evidence 
 
 Thor's key is available through Bitwarden; run `python3 oci/scripts/select-ssh-agent-key.py`. Bootstrap with explicit `IdentityAgent` and the selected public key at `ubuntu@100.89.233.80`. The private key stays in Bitwarden. Thor currently binds SSH only on that tailnet IP. Use the reviewed `bootstrap-router.yaml` to add 10.10.50.10 alongside it; use `ssh ubuntu@10.10.50.10` only after listener and route verification. Other Linux private IPs and Windows IP come from `terraform output`. Administrators accept the approved OCI routes (`tailscale set --accept-routes=true` on Linux). Only the router runs Tailscale; Wings peers and Windows do not.
 
-Merge `ansible/tailscale/policy.example.hujson` with existing tailnet policy. Replace placeholders with actual node destinations and admin identities; add policy tests covering allowed admin access, allowed pos/optiplex API/metrics, and denied ordinary users. Approve routes explicitly in the admin console. If using autoApprovers, scope to `tag:oci-router` and only the two actual subnets; do not grant all subnet advertisements. Manage device expiry and persist tailscaled. Use a tagged scoped one-use authentication key for enrollment; no key belongs in state or user-data. Standard SNAT sees the router /32 at OCI destinations; return traffic uses connection tracking. Do not add a default route through OCI.
+The proposed actual policy is `ansible/tailscale/policy.hujson`, using Tailscale's current grants syntax. The user reports the existing policy is allow-all and requested a restrictive replacement. The file uses observed IPv4 identities with no placeholders or catch-all grant:
+
+| Source | Destination | Permitted traffic |
+|---|---|---|
+| azoz-laptop + freyr | pos, optiplex, Thor/router | OpenSSH TCP/22 |
+| azoz-laptop | freyr | SSH TCP/22 and RDP TCP/3389 |
+| Both admin clients | pos/optiplex tailnet and known LAN addresses | HTTP/HTTPS TCP/80,443 |
+| Both admin clients | pos tailnet/known LAN address | Kubernetes API 6443, AdGuard UI 3000, DNS TCP/UDP 5353 |
+| Both admin clients | 10.10.50.0/24 Wings subnet | SSH 22, Wings API 8080, SFTP 2022, metrics 9100 |
+| Both admin clients | 10.10.10.0/24 Windows subnet | TCP/3389 only |
+| pos + optiplex | Wings subnet and router tailnet address/tag | TCP/8080,9100 only |
+| Thor/router tag | pos tailnet address | TCP/443 for Panel callbacks only |
+| Other tailnet devices | Infrastructure | No grant; default denied |
+
+`azoz-laptop` (100.66.202.74) and `freyr` (100.82.125.5) are the proposed trusted admin clients. The verified tailnet owner account can assign `tag:oci-router`, but owning a device does not automatically grant it network administration access. Other members' devices, the owner's phone and the old home-router device are deliberately denied infrastructure access unless a later explicit rule is reviewed. Align the router's `router_tailnet_admin_sources` with these two admin IPs. Review this trust choice before applying.
+
+This is an IPv4 management policy; native IPv6 and ICMP are not granted. Use the documented IPv4 private/tailnet addresses for connection checks; routing health probes use TCP rather than ping. Known homelab LAN /32 rules only authorize traffic: they do not create a home subnet route or revive the offline home router. Public game clients use public OCI game addresses and are outside these tailnet grants. Kubernetes node-to-node LAN/CNI traffic is not altered by a tailnet policy.
+
+Before saving, back up the current policy, preserve any unrelated DNS/nodeAttrs/settings, and **remove the old allow-all ACL/grants**. Adding this policy's scoped grants alongside allow-all does not restrict anything because grants are additive. The explicit empty `acls` and `ssh` sections remove legacy blanket network/Tailscale-SSH rules; normal OpenSSH still uses the TCP/22 grants and existing SSH keys. Validate the complete candidate in the Tailscale Access controls editor and require its embedded `tests` to pass, including denied ordinary users and denied server-to-admin SSH. Local JSON/selector checks do not replace that control-plane validation. Probe addresses ending in .20 in the tests exercise subnet rules; they are not invented VM assignments.
+
+No autoApprovers are included. After the reviewed router bootstrap advertises them, approve **only** `10.10.50.0/24` and `10.10.10.0/24` on Thor in Machines → Subnets → Edit. Route approval and access grants are separate. Manage device expiry and persist tailscaled. Use a tagged scoped one-use authentication key only if enrollment is necessary; the existing authenticated Thor should not need one. Standard subnet-router SNAT means OCI targets see router source 10.10.50.10/32; no return route to the tailnet is required. No default/exit-node route is granted. This policy is prepared in Git, not applied live.
+
 
 `render-inventory.py` writes a private `wings.hosts` mapping from real state. Add those names to existing home DNS and CoreDNS's `home.internal` host mapping, then test resolution from a Panel pod and browser. The generated file is input for reviewed DNS configuration, not an automatically deployed CoreDNS replacement. `pelican.home.internal` resolves to Traefik at home, and to 10.10.50.10 only on OCI guests. The callback Caddy role connects directly to pos's existing tailnet IP with TLS SNI `pelican.home.internal`; no home LAN subnet route is assumed.
 

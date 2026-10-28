@@ -27,7 +27,7 @@ Advertise only `10.10.50.0/24` and `10.10.10.0/24`. Use default subnet-router SN
 
 The router's own private address is reached over its Tailscale interface before SNAT. Its host firewall therefore allows explicit administrator tailnet sources plus the Kubernetes nodes for Wings API/metrics; do not expect a rule allowing only its private /32 to permit its own tailnet-delivered management traffic.
 
-`homelab-routes.yaml` explicitly enables route acceptance on both Kubernetes hosts and persists pod-source SNAT for **only OCI destination subnets**, so pod egress has a tailnet identity that can receive a grant. Test from a pod scheduled on each host; node-level ping is insufficient. The grants example must be merged with current tailnet policy and tested; no OAuth/auth keys go to Terraform or Git.
+`homelab-routes.yaml` explicitly enables route acceptance on both Kubernetes hosts and persists pod-source SNAT for **only OCI destination subnets**, so pod egress has a tailnet identity that can receive a grant. Test from a pod scheduled on each host; node-level ping is insufficient. The actual `ansible/tailscale/policy.hujson` must replace allow-all network rules and pass its embedded Tailscale tests; no OAuth/auth keys go to Terraform or Git.
 
 Wings on non-router nodes needs callbacks to Panel but has no Tailscale client. A private TLS Caddy proxy on the existing router forwards `pelican.home.internal` to `100.114.113.82:443`, with the Panel Host header, SNI and trusted homelab CA. OCI guests resolve that name to the router private IP; homelab resolves it to Traefik. This avoids reliance on the offline home subnet advertiser or public Panel exposure. The callback proxy is single-host dependent on Thor/pos; recovery instructions cover that limitation.
 

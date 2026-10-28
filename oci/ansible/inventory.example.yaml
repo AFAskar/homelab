@@ -46,7 +46,7 @@ all:
           tailscale_routes: [REPLACE_ACTUAL_OCI_SUBNET_CIDR]
           tailscale_tag: tag:oci-router
           tailscale_auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"
-          router_tailnet_admin_sources: ["100.66.202.74/32"]
+          router_tailnet_admin_sources: ["100.66.202.74/32", "100.82.125.5/32"]
     homelab:
       hosts:
         pos:
