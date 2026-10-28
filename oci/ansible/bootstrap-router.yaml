@@ -61,11 +61,11 @@
         jump: ACCEPT
         action: insert
         rule_num: '1'
-    - name: Apply SSH listeners while keeping existing sessions
-      ansible.builtin.meta: flush_handlers
-    - name: Verify SSH daemon configuration
+    - name: Verify SSH daemon configuration before restart
       ansible.builtin.command: /usr/sbin/sshd -t
       changed_when: false
+    - name: Apply SSH listeners while keeping existing sessions
+      ansible.builtin.meta: flush_handlers
   handlers:
     - name: Refresh SSH sockets
       ansible.builtin.systemd_service:
