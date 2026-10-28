@@ -65,3 +65,32 @@ Nothing in this delivery has been deployed. No Terraform apply, authoritative st
 ## Required approvals
 
 No billable operation is ready for approval while the above blockers prevent a complete safe plan. After resolution, request approval for the concrete state bootstrap and image/storage/compute plan with updated all-in cost. Obtain separate explicit approval for access-cutting/destructive cleanup and any requirements change. Do not merge this draft PR without the user's explicit instruction.
+
+## CodeRabbit review follow-up
+
+Accepted the functional findings with focused commits: application readiness, SSH validation before restart, callback tailnet grant, refreshable exporter inventory, clear locked-agent errors, retry-safe Windows import, JSON tfvars exclusion, Caddy 2.6.2 trust syntax, CA/DNS before any Wings start, bootstrap/Panel/certificate prerequisites, private-port range exclusions, EndpointSlice discovery and partition-signature guards. Also accepted the small `nofail` recovery and IMDSv2-only improvements. `AGENTS.md` now requires atomic commits and validation.
+
+The Panel CA copy was byte-identical to `pki/homelab-root-ca.crt`. It has been removed: a shared `pki/kustomization.yaml` generates the ConfigMap from that sole existing public certificate, respecting Kustomize loading restrictions without maintaining a duplicate CA file.
+
+Validation of the review fixes:
+
+- Panel/Kustomize/KSOPS build succeeds; the generated CA data exactly matches the PKI source. Kubeconform reports 9 valid objects, 3 CRDs skipped, no invalid objects; live Kubernetes API dry-run validates those CRDs as well in the existing default namespace. Nothing is persisted.
+- Ansible syntax/lint passes. The callback Caddyfile validates with the exact Caddy 2.6.2 upstream binary (publisher SHA512 verified), using disposable local test certificates; Thor's archive candidate is 2.6.2-14. No Caddy package was installed on Thor.
+- Non-modifying signature probes distinguish blank, GPT and ext4 disposable files and preserve their SHA256 values. Formatting remains gated; no live disk was formatted. `nofail` keeps the host bootable, while Wings still requires the data mount.
+- Terraform formatting/validation passes. Diagnostic console checks accept TCP/25565 and reject individual private ports 2022/3389/8080/9100 and ranges 2000–3000 / 9000–10000; no API write or apply occurs.
+- Offline tests preserve an existing private inventory while refreshing all four synthetic exporter/DNS targets. Empty/malformed agents produce clear failures without a traceback or output key.
+- Offline Windows import tests cover a fresh upload, empty CLI list output, existing import reuse, existing upload reuse and checksum-mismatch rejection. No OCI upload/import was performed. Existing-import polling uses supported CLI commands; concurrent imports of the same source must still be serialized by the operator.
+- ShellCheck, Python compilation, six lifecycle regression tests and redacted secret scanning pass.
+
+Findings intentionally not applied:
+
+- Redacting every live address/OCID from the discovery record would remove the exact inventory requested by the user, while those identifiers remain required in the import definitions. Public certificates, addresses and resource OCIDs are not authentication credentials. Raw inventories, private keys, credentials, billing personal data, state and plans remain excluded from Git.
+- The three new exporter IPs cannot be added before those instances exist. The renderer already derives all four targets from actual Terraform outputs and can now refresh them without discarding operator inventory. No fictional addresses are added.
+- A read-only root filesystem is not applied blindly to the official Panel image, which writes runtime application/plugin/cache files. Its UID/capability restrictions remain; changing its filesystem layout warrants application testing beyond this focused fix.
+
+## What the user needs to decide or provide
+
+1. **Windows hosting/requirements:** confirm whether Windows 11 must remain on OCI. The documented Windows import minimum is 256 GB, not the requested 200 GB, and custom-image shielded/TPM support is still unresolved. Approving +56 GB (about €2.14/month) alone does not solve TPM or firmware compatibility. A full OCI deployment requires a confirmed compatible Windows workflow and an approved allocation change, or an explicitly approved different Windows hosting arrangement. The local source image is already available; no replacement media/key is needed from the user.
+2. **Credits:** confirm the Console's actual remaining credit, promotion expiry, and effective A1 free allowance for this account. The queried price API and narrative free-tier documentation conflict; the smaller allowance would put the baseline above €250. Reported zero cost is not a credit-balance proof. Do not send billing/payment secrets.
+3. **Tailnet administration:** approve/apply the reviewed tag ownership, scoped grants and the two advertised subnet routes in the existing tailnet, or provide access to an authenticated admin session. Do not replace the existing policy wholesale. Existing OCI and Bitwarden credentials work; no new private SSH key is needed.
+4. **Deployment approval:** after these decisions, approve the concrete saved plans for private versioned state-bucket bootstrap, safe imports/access migration and billable resources/image storage. The agent can prepare and execute the technical steps; the user need not manually create VMs, certificates or the Panel. Billable applies, access-cutting changes, cleanup and merging remain withheld until the applicable explicit approvals.
