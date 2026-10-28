@@ -11,6 +11,8 @@ object="win11-$digest.qcow2"
 image_name="win11-lab-$digest"
 # A failed/timed-out import must resume the same image, never create a duplicate.
 images=$(oci compute image list --compartment-id "$OCI_COMPARTMENT_OCID" --display-name "$image_name" --all)
+# OCI CLI emits no JSON when a list is empty.
+images=${images:-'{"data":[]}'}
 image_id=$(python3 -c '
 import json,sys
 images=[i for i in json.load(sys.stdin)["data"] if i["display-name"]==sys.argv[1] and i["lifecycle-state"]!="TERMINATED"]
@@ -19,8 +21,17 @@ if images and images[0]["lifecycle-state"] not in ["AVAILABLE","IMPORTING"]: rai
 print(images[0]["id"] if images else "")
 ' "$image_name" <<< "$images")
 if [[ -n $image_id ]]; then
-  oci compute image get --image-id "$image_id" --wait-for-state AVAILABLE --max-wait-seconds 7200 --query data.id --raw-output
-  exit 0
+  deadline=$((SECONDS + 7200))
+  while (( SECONDS < deadline )); do
+    state=$(oci compute image get --image-id "$image_id" --query 'data."lifecycle-state"' --raw-output)
+    case "$state" in
+      AVAILABLE) printf '%s\n' "$image_id"; exit 0 ;;
+      IMPORTING) sleep 30 ;;
+      *) echo "Existing image entered state $state; inspect before retrying." >&2; exit 2 ;;
+    esac
+  done
+  echo "Timed out waiting for $image_id; rerun to resume without creating another image." >&2
+  exit 1
 fi
 objects=$(oci os object list --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --prefix "$object" --all)
 exists=$(python3 -c 'import json,sys; print(any(x["name"]==sys.argv[1] for x in json.load(sys.stdin)["data"]["objects"]))' "$object" <<< "$objects")
