@@ -11,6 +11,7 @@ oci/**/.terraform/
 oci/**/*.tfstate*
 oci/**/*.tfplan
 oci/**/*.tfvars
+oci/**/*.tfvars.json
 oci/**/backend.hcl
 oci/inventory/
 oci/ansible/inventory.yaml
