@@ -51,7 +51,7 @@
               header_up Host pelican.home.internal
               transport http {
                 tls_server_name pelican.home.internal
-                tls_trust_pool file /etc/caddy/pki/homelab-ca.crt
+                tls_trusted_ca_certs /etc/caddy/pki/homelab-ca.crt
               }
             }
           }
