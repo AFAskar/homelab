@@ -56,6 +56,19 @@
     group: root
     mode: '0750'
   loop: [/etc/pelican, /etc/pelican/tls, /var/run/wings, /var/lib/pelican, /var/log/pelican]
+- name: Install homelab root CA for Wings Panel callbacks
+  ansible.builtin.copy:
+    src: "{{ homelab_ca_local }}"
+    dest: /usr/local/share/ca-certificates/homelab-root-ca.crt
+    mode: '0644'
+  notify: Refresh CA trust
+- name: Resolve private Panel callback through the OCI router
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '.*\s+pelican\.home\.internal$'
+    line: "{{ router_private_ip }} pelican.home.internal"
+- name: Refresh trusted CAs before Wings can start or restart
+  ansible.builtin.meta: flush_handlers
 - name: Download pinned native Wings binary with release digest
   ansible.builtin.get_url:
     url: "https://github.com/pelican-dev/wings/releases/download/{{ wings_version }}/wings_linux_{{ wings_arch }}"
@@ -100,21 +113,6 @@
     dest: /etc/systemd/system/wings.service
     mode: '0644'
   notify: Restart wings
-- name: Install homelab root CA for Wings Panel callbacks
-  ansible.builtin.copy:
-    src: "{{ homelab_ca_local }}"
-    dest: /usr/local/share/ca-certificates/homelab-root-ca.crt
-    mode: '0644'
-  register: wings_ca_certificate
-- name: Refresh CA trust before starting Wings
-  ansible.builtin.command: update-ca-certificates
-  when: wings_ca_certificate.changed
-  changed_when: true
-- name: Resolve private Panel callback through the OCI router
-  ansible.builtin.lineinfile:
-    path: /etc/hosts
-    regexp: '.*\s+pelican\.home\.internal$'
-    line: "{{ router_private_ip }} pelican.home.internal"
 - name: Enable Docker and Wings across reboots
   ansible.builtin.systemd_service:
     name: "{{ item }}"
