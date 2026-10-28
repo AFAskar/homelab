@@ -49,8 +49,8 @@ variable "game_ports" {
   type        = map(object({ protocol = string, min = number, max = number }))
   default     = { minecraft = { protocol = "6", min = 25565, max = 25565 } }
   validation {
-    condition     = alltrue([for p in values(var.game_ports) : contains(["6", "17"], p.protocol) && p.min >= 1024 && p.max <= 65535 && p.min <= p.max && !(p.min <= 3389 && p.max >= 3389) && !(p.min <= 8080 && p.max >= 8080)])
-    error_message = "TCP/UDP game ranges must exclude RDP and the private Wings API."
+    condition     = alltrue([for p in values(var.game_ports) : contains(["6", "17"], p.protocol) && p.min >= 1024 && p.max <= 65535 && p.min <= p.max && alltrue([for private_port in [2022, 3389, 8080, 9100] : !(p.min <= private_port && p.max >= private_port)])])
+    error_message = "TCP/UDP game ranges must exclude private SFTP (2022), RDP (3389), Wings API (8080) and exporter (9100) ports."
   }
 }
 variable "backup_bucket_name" { type = string }
