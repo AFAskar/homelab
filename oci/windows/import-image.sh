@@ -8,7 +8,7 @@ set -euo pipefail
 [[ $# == 1 && -f $1 ]] || { echo 'Usage: import-image.sh generalized.qcow2' >&2; exit 2; }
 object="win11-$(sha256sum "$1" | cut -d' ' -f1).qcow2"
 oci os object put --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --name "$object" --file "$1" --no-overwrite
-oci compute image create --compartment-id "$OCI_COMPARTMENT_OCID" --display-name win11-lab \
+oci compute image create --compartment-id "$OCI_COMPARTMENT_OCID" --display-name win11-lab --operating-system Windows --operating-system-version "Windows 11" \
   --launch-mode PARAVIRTUALIZED --image-source-details "$(python3 - "$OCI_IMAGE_NAMESPACE" "$OCI_IMAGE_BUCKET" "$object" <<'ENDPY'
 import json,sys
 print(json.dumps(dict(sourceType='objectStorageTuple',namespaceName=sys.argv[1],bucketName=sys.argv[2],objectName=sys.argv[3],sourceImageType='QCOW2')))

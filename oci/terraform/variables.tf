@@ -79,7 +79,7 @@ variable "discovery_reviewed" {
   default     = false
 }
 variable "windows_compatibility_verified" {
-  description = "Must remain false until a supported E4/custom Windows 11 TPM2 + UEFI path is evidenced."
+  description = "Must remain false until supported custom Windows 11 TPM2/UEFI and the requested 200GB boot allocation are evidenced; OCI documents a 256GB minimum."
   type        = bool
   default     = false
 }

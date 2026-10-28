@@ -41,6 +41,8 @@ ansible-galaxy collection install -r requirements.yaml
 # inventory.example.yaml documents all inputs. Or generate inventory from state:
 python3 ../scripts/render-inventory.py
 ansible-playbook --syntax-check site.yaml
+# Existing Thor first needs the reviewed bootstrap-router.yaml over tailnet SSH.
+# See migration.md: preserve its current listener before private-IP provisioning.
 ansible-playbook site.yaml
 ansible-playbook homelab-routes.yaml
 ansible-playbook tailscale/panel-proxy.yaml
@@ -51,3 +53,5 @@ Review the generated inventory before use. Existing Thor data requires `retained
 Panel manifests live at `kubernetes/pelican/`, following the existing repository layout, CA, SOPS recipient, and application-of-applications integration. Its Argo application has **manual sync**. Build with `kustomize build --enable-alpha-plugins --enable-exec kubernetes/pelican/manifests` using the authorized SOPS age key. A generated APP_KEY is already encrypted to the repository recipient; protect its backup. Finish the official `/installer` before node enrollment. Do not expose the installer publicly.
 
 [Operations](docs/operations.md) covers private TLS/DNS, enrollment, backups, monitoring, Windows tooling and recovery. [Architecture](docs/architecture.md) records network flows and ARM limitations. Billable deployment, cleanup and merge require explicit approval; a passing static check is not deployment approval.
+
+Windows source follow-up: the existing MPMB Windows 11 Pro VM was inspected and a verified offline checkpoint was cloned locally to ignored `oci/windows/work/mpmb-source.qcow2`. `windows/clone-checkpoint.py` reproduces this without touching the running VM; `windows/inspect-source.ps1` records read-only guest checks. It is not sanitized/generalized or imported. OCI's documented 256 GB custom-Windows boot minimum also conflicts with the requested 200 GB; the matrix remains unchanged pending resolution.

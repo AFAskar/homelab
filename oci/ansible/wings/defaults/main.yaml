@@ -14,3 +14,4 @@ private_access_verified: false
 # Deliberately false: installing firewall lockdown before route verification
 # would destroy the last working access path.
 apply_private_firewall: false
+# Router must retain a scoped rule for its own private-IP SSH on tailscale0.

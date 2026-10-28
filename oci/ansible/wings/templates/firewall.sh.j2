@@ -15,6 +15,10 @@ iptables -A PELICAN-IN -s {{ cidr }} -p tcp -m multiport --dports 8080,2022,9100
 {% endfor %}
 # Traffic addressed to the router itself arrives on tailscale0 before SNAT.
 {% if inventory_hostname in groups.get('subnet_routers', []) %}
+# Preserve the existing direct tailnet SSH path until independently retired.
+{% for cidr in panel_callback_source_cidrs | default(['10.10.50.0/24']) %}
+iptables -A PELICAN-IN -d {{ router_private_ip }} -s {{ cidr }} -p tcp --dport 443 -j ACCEPT
+{% endfor %}
 {% for cidr in router_tailnet_admin_sources %}
 iptables -A PELICAN-IN -i tailscale0 -s {{ cidr }} -p tcp -m multiport --dports 22,8080,2022,9100 -j ACCEPT
 {% endfor %}

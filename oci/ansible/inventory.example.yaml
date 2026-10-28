@@ -2,9 +2,9 @@ all:
   vars:
     ansible_user: ubuntu # discover the actual user of wings-04
     # Replace these with actual sources and package versions after discovery.
-    admin_source_cidrs: ["10.0.0.2/32"]
-    router_source_cidrs: ["10.0.0.2/32"]
-    router_private_ip: REPLACE_ROUTER_PRIVATE_IP
+    admin_source_cidrs: ["10.10.50.10/32"]
+    router_source_cidrs: ["10.10.50.10/32"]
+    router_private_ip: 10.10.50.10
     homelab_ca_local: "{{ inventory_dir }}/../../pki/homelab-root-ca.crt"
     panel_private_url: https://pelican.home.internal
     docker_ce_version: 5:29.9.2-1~ubuntu.26.04~resolute
@@ -30,11 +30,16 @@ all:
         wings-04:
           ansible_host: 10.10.50.10
           wings_new_data_volume: false
-          retained_data_reviewed: false
+          retained_data_reviewed: false # guest inspected; secure backup/review still required before provisioning
+          wings_public_interface: enp0s6
+          ansible_ssh_private_key_file: "{{ inventory_dir }}/../inventory/thor-agent.pub"
+          ansible_ssh_common_args: >-
+            -o IdentityAgent=/home/azoz-laptop/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock
+            -o IdentitiesOnly=yes
     subnet_routers:
       hosts:
         wings-04:
-          tailscale_version: REPLACE_VERIFIED_PACKAGE_VERSION
+          tailscale_version: 1.104.4
           tailscale_routes: [REPLACE_ACTUAL_OCI_SUBNET_CIDR]
           tailscale_tag: tag:oci-router
           tailscale_auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"
@@ -50,3 +55,18 @@ all:
           ansible_become_method: doas
       vars:
         oci_subnet_cidrs: [REPLACE_ACTUAL_OCI_SUBNET_CIDR]
+    thor_bootstrap:
+      hosts:
+        thor-bootstrap:
+          ansible_host: 100.89.233.80
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: "{{ inventory_dir }}/../inventory/thor-agent.pub"
+          ansible_ssh_common_args: >-
+            -o IdentityAgent=/home/azoz-laptop/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock
+            -o IdentitiesOnly=yes
+          tailscale_version: 1.104.4
+          tailscale_routes: [10.10.50.0/24, 10.10.10.0/24]
+          tailscale_tag: tag:oci-router
+          tailscale_auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"
+          router_private_ip: 10.10.50.10
+          enable_private_ssh_listener: false
