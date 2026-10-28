@@ -65,7 +65,7 @@
     path: "{{ wings_data_mount }}"
     src: "UUID={{ data_uuid.stdout }}"
     fstype: "{{ data_signature.stdout if data_signature.rc == 0 else 'ext4' }}"
-    opts: defaults
+    opts: defaults,nofail
     state: mounted
 # No Docker data-root migration on an existing node. Panel-generated config MUST
 # put paid game data in /srv/pelican/volumes. Service requires that mount.
