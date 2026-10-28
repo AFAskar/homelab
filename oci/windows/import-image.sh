@@ -46,7 +46,7 @@ import json,sys
 print(json.dumps(dict(sourceType='objectStorageTuple',namespaceName=sys.argv[1],bucketName=sys.argv[2],objectName=sys.argv[3],sourceImageType='QCOW2')))
 ENDPY
 )
-oci compute image create --compartment-id "$OCI_COMPARTMENT_OCID" --display-name "$image_name" --operating-system Windows --operating-system-version "Windows 11" \
+oci compute image create --compartment-id "$OCI_COMPARTMENT_OCID" --display-name "$image_name" --operating-system Windows --operating-system-version Windows11 \
   --launch-mode PARAVIRTUALIZED --image-source-details "$source_details" --wait-for-state AVAILABLE --max-wait-seconds 7200 --query data.id --raw-output
 # Do not delete source images automatically. Import does not prove guest compatibility.
 # Serialize runs for the same source disk; this is retry-safe, not a distributed lock.

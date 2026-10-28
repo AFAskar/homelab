@@ -1,0 +1,7 @@
+{
+  "Compute.Firmware": {"descriptorType":"enumstring","values":["UEFI_64"],"defaultValue":"UEFI_64"},
+  "Compute.SecureBoot": {"descriptorType":"boolean","defaultValue":true},
+  "Compute.LaunchMode": {"descriptorType":"enumstring","values":["PARAVIRTUALIZED"],"defaultValue":"PARAVIRTUALIZED"},
+  "Network.AttachmentType": {"descriptorType":"enumstring","values":["PARAVIRTUALIZED"],"defaultValue":"PARAVIRTUALIZED"},
+  "Storage.BootVolumeType": {"descriptorType":"enumstring","values":["PARAVIRTUALIZED"],"defaultValue":"PARAVIRTUALIZED"}
+}
