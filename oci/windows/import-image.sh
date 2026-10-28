@@ -7,6 +7,8 @@ set -euo pipefail
 : "${OCI_COMPARTMENT_OCID:?}" "${OCI_IMAGE_BUCKET:?}" "${OCI_IMAGE_NAMESPACE:?}"
 [[ $# == 1 && -f $1 ]] || { echo 'Usage: import-image.sh generalized.qcow2' >&2; exit 2; }
 digest=$(sha256sum "$1" | cut -d' ' -f1)
+: "${OCI_APPROVED_IMAGE_SHA256:?Supply the finalized image SHA256 recorded in the approved import plan}"
+[[ $OCI_APPROVED_IMAGE_SHA256 =~ ^[0-9a-f]{64}$ && $digest == "$OCI_APPROVED_IMAGE_SHA256" ]] || { echo 'Image differs from the approved SHA256; stop and review it again.' >&2; exit 2; }
 object="win11-$digest.qcow2"
 image_name="win11-lab-$digest"
 # A failed/timed-out import must resume the same image, never create a duplicate.
