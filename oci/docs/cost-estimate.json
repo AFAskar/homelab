@@ -1,0 +1,76 @@
+{
+  "retrieved_utc": "2026-10-28T18:09:34.354334+00:00",
+  "pricing_source": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD",
+  "prices_updated": "2026-10-08T14:38:16.165Z",
+  "fx_source": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+  "fx_date": "2026-10-28",
+  "usd_per_eur": "1.1133",
+  "runtime_hours": 730,
+  "windows_hours": 120,
+  "rows": {
+    "wings-01 compute": {
+      "USD": "67.16",
+      "EUR": "60.33"
+    },
+    "wings-01 250GB balanced": {
+      "USD": "10.62",
+      "EUR": "9.54"
+    },
+    "wings-02 compute": {
+      "USD": "67.16",
+      "EUR": "60.33"
+    },
+    "wings-02 250GB balanced": {
+      "USD": "10.62",
+      "EUR": "9.54"
+    },
+    "wings-03 compute": {
+      "USD": "67.16",
+      "EUR": "60.33"
+    },
+    "wings-03 250GB balanced": {
+      "USD": "10.62",
+      "EUR": "9.54"
+    },
+    "win11 compute": {
+      "USD": "8.88",
+      "EUR": "7.98"
+    },
+    "win11 200GB balanced, including stopped hours": {
+      "USD": "8.50",
+      "EUR": "7.63"
+    },
+    "50GB backups, no free allowance deducted": {
+      "USD": "1.28",
+      "EUR": "1.15"
+    },
+    "custom image storage": {
+      "USD": "0.00",
+      "EUR": "0.00"
+    },
+    "uploaded source image storage": {
+      "USD": "0.00",
+      "EUR": "0.00"
+    },
+    "existing non-free resources": {
+      "USD": "0.00",
+      "EUR": "0.00"
+    },
+    "other measured charges": {
+      "USD": "0.00",
+      "EUR": "0.00"
+    }
+  },
+  "total_usd": "252.0100",
+  "total_eur": "226.36",
+  "remaining_after_month_eur": "23.64",
+  "credit_days_at_average_burn": "33.59",
+  "assumptions": [
+    "No free storage allowance double-counted",
+    "wings-04 costs unknown until inventory; assumes eligibility retained",
+    "Image/source storage sizes unknown unless supplied",
+    "Egress and other tenancy spend unknown; extra-usd must include them",
+    "Trial expiration and actual credit balance unknown",
+    "Taxes and regional contract prices not established"
+  ]
+}

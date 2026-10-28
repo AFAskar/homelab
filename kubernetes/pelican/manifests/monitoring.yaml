@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oci-wings
+  labels:
+    app: oci-wings
+spec:
+  ports:
+  - name: metrics
+    port: 9100
+    targetPort: 9100
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: oci-wings
+  labels:
+    release: monitoring
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: oci-wings
+  endpoints:
+  - port: metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: oci-wings
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: oci-wings
+    rules:
+    - alert: OciWingsUnreachable
+      expr: up{job="oci-wings"} == 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Private exporter is unreachable; check subnet route and node health.
+    - alert: OciWingsServiceDown
+      expr: node_systemd_unit_state{job="oci-wings",name=~"wings.service|docker.service|tailscaled.service|caddy.service",state="active"}
+        == 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: An OCI Wings/router service is inactive.
+    - alert: OciWingsDiskAlmostFull
+      expr: node_filesystem_avail_bytes{job="oci-wings",fstype!~"tmpfs|overlay|squashfs"}
+        / node_filesystem_size_bytes{job="oci-wings",fstype!~"tmpfs|overlay|squashfs"}
+        < 0.15
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: An OCI filesystem has less than 15% free space.
+    - alert: OciWingsMemoryPressure
+      expr: node_memory_MemAvailable_bytes{job="oci-wings"} / node_memory_MemTotal_bytes{job="oci-wings"}
+        < 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: An OCI node has less than 10% available memory.
+    - alert: OciWingsCpuSaturated
+      expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{job="oci-wings",mode="idle"}[5m]))
+        > 0.9
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: An OCI node has sustained high CPU use.

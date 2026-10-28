@@ -14,3 +14,5 @@ however you still need to write the manifests yourself
 - [ ] ExternalDNS integration for auto provisioned records instead of the current traefik with wildcard
 
 Cluster rebuild and PKI procedures are documented in [`docs/`](docs/).
+
+OCI infrastructure implementation and deployment status: [`oci/README.md`](oci/README.md).

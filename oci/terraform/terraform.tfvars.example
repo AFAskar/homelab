@@ -1,0 +1,22 @@
+# Live OCI identifiers discovered 2026-10-28; billing currency/Windows image/recipient remain unverified.
+region = "me-riyadh-1"
+home_region = "me-riyadh-1"
+tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaajtikdhgav7o7uksgc56xmuuvhx56pdunebmt4qlpzlltrkvxvbea"
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaavoznuamfvzwjj2n4ae3xbtgxkskv7kuqexsu4oqp3jxjmrj4proq"
+vcn_ocid = "ocid1.vcn.oc1.me-riyadh-1.amaaaaaacxr7q4yaqvniywct7uarhvswzla6xt7ftycmadz6raemok7wuydq"
+wings_subnet_ocid = "ocid1.subnet.oc1.me-riyadh-1.aaaaaaaabntumthbgvuoafso256p6hmd24hysr44rkj7ocf5opoyg2kc7efq"
+windows_subnet_ocid = "ocid1.subnet.oc1.me-riyadh-1.aaaaaaaayhfi44i2eetqrk6rcebtpeuyva6v2t74ahwwwdc4ki22h3lk4qva"
+availability_domain = "jRPH:ME-RIYADH-1-AD-1"
+ubuntu_image_ocid = "ocid1.image.oc1.me-riyadh-1.aaaaaaaaacwhx5w63nxioye4qlniyr7yfaeunzu6tv352anqqvwfznzzlqba"
+windows_image_ocid = "REQUIRES_SUPPORTED_WINDOWS11_IMAGE"
+existing_instance_ocid = "ocid1.instance.oc1.me-riyadh-1.anqwuljrcxr7q4yceguaprmui5mfmmyk3t3sznfxlinck3p2bcz3y6krpgaq"
+retained_boot_volume_ocid = "ocid1.bootvolume.oc1.me-riyadh-1.abqwuljruatmalgpfpro2ov5firdjn53exqjn6mv2e4z2gakty5gkbjdvbpa"
+retained_data_volumes = {}
+router_private_ip = "10.10.50.10"
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOO/JAyyrpdQlQ5cIkdZvT9oVlcEUI9kD5liFXqzfQI5 KaliVM"
+backup_bucket_name = "homelab-pelican-backups"
+budget_recipients = "REPLACE_VERIFIED_EMAIL"
+billing_currency = "EUR"
+billing_units_per_eur = 1
+discovery_reviewed = false
+windows_compatibility_verified = false

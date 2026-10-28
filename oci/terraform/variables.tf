@@ -1,0 +1,91 @@
+variable "region" { type = string }
+variable "home_region" { type = string }
+variable "oci_profile" {
+  type    = string
+  default = "DEFAULT"
+}
+variable "tenancy_ocid" { type = string }
+variable "compartment_ocid" { type = string }
+variable "vcn_ocid" { type = string }
+variable "wings_subnet_ocid" { type = string }
+variable "windows_subnet_ocid" { type = string }
+variable "availability_domain" { type = string }
+variable "ubuntu_image_ocid" {
+  description = "Region-specific Canonical Ubuntu 26.04 x86_64 image verified against E6.Flex. No automatic latest/fallback."
+  type        = string
+}
+variable "windows_image_ocid" {
+  description = "Imported Windows 11 image. Required; deployment remains blocked by custom-image TPM compatibility."
+  type        = string
+}
+variable "ssh_public_key" {
+  type = string
+  validation {
+    condition     = can(regex("^ssh-(ed25519|rsa) ", var.ssh_public_key))
+    error_message = "Supply an SSH public key, never a private key."
+  }
+}
+variable "existing_instance_ocid" { type = string }
+variable "retained_boot_volume_ocid" { type = string }
+variable "retained_data_volumes" {
+  description = "Actual discovered block-volume OCIDs keyed by a stable local name. No invented storage."
+  type        = map(string)
+  default     = {}
+}
+variable "router_private_ip" {
+  description = "Discovered wings-04 VCN IP; subnet-router SNAT source for private administration."
+  type        = string
+  validation {
+    condition     = can(cidrnetmask("${var.router_private_ip}/32"))
+    error_message = "Supply a single private IPv4 address."
+  }
+}
+variable "extra_router_private_ips" {
+  type    = set(string)
+  default = []
+}
+variable "game_ports" {
+  description = "Explicit public allocations, shared on each Wings host. Add only ports allocated in Panel."
+  type        = map(object({ protocol = string, min = number, max = number }))
+  default     = { minecraft = { protocol = "6", min = 25565, max = 25565 } }
+  validation {
+    condition     = alltrue([for p in values(var.game_ports) : contains(["6", "17"], p.protocol) && p.min >= 1024 && p.max <= 65535 && p.min <= p.max && !(p.min <= 3389 && p.max >= 3389) && !(p.min <= 8080 && p.max >= 8080)])
+    error_message = "TCP/UDP game ranges must exclude RDP and the private Wings API."
+  }
+}
+variable "backup_bucket_name" { type = string }
+variable "budget_recipients" {
+  description = "Comma-separated verified notification email addresses."
+  type        = string
+}
+variable "billing_currency" {
+  type = string
+  validation {
+    condition     = contains(["EUR", "USD"], var.billing_currency)
+    error_message = "Verify tenancy billing currency; this configuration supports EUR or USD."
+  }
+}
+variable "billing_units_per_eur" {
+  description = "1 for EUR billing; verified dated USD/EUR conversion for USD billing. Budgets API uses billing currency."
+  type        = number
+  validation {
+    condition     = var.billing_units_per_eur > 0 && (var.billing_currency != "EUR" || var.billing_units_per_eur == 1)
+    error_message = "A positive verified conversion is required; EUR must use 1."
+  }
+}
+variable "discovery_reviewed" {
+  description = "Set only after inventory, quota, free eligibility, ingress and non-overlap reviews."
+  type        = bool
+  default     = false
+}
+variable "windows_compatibility_verified" {
+  description = "Must remain false until a supported E4/custom Windows 11 TPM2 + UEFI path is evidenced."
+  type        = bool
+  default     = false
+}
+
+variable "private_access_verified" {
+  description = "Set only after private SSH through the approved subnet route succeeds; scopes retained SSH security-list rules to router IP."
+  type        = bool
+  default     = false
+}

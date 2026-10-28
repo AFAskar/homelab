@@ -1,0 +1,52 @@
+all:
+  vars:
+    ansible_user: ubuntu # discover the actual user of wings-04
+    # Replace these with actual sources and package versions after discovery.
+    admin_source_cidrs: ["10.0.0.2/32"]
+    router_source_cidrs: ["10.0.0.2/32"]
+    router_private_ip: REPLACE_ROUTER_PRIVATE_IP
+    homelab_ca_local: "{{ inventory_dir }}/../../pki/homelab-root-ca.crt"
+    panel_private_url: https://pelican.home.internal
+    docker_ce_version: 5:29.9.2-1~ubuntu.26.04~resolute
+    containerd_version: 2.4.2-3~ubuntu.26.04~resolute
+    wings_config_local: "{{ inventory_dir }}/secrets/{{ inventory_hostname }}/config.yml"
+    wings_tls_cert_local: "{{ inventory_dir }}/secrets/{{ inventory_hostname }}/tls.crt"
+    wings_tls_key_local: "{{ inventory_dir }}/secrets/{{ inventory_hostname }}/tls.key"
+  children:
+    wings:
+      hosts:
+        wings-01:
+          ansible_host: REPLACE_PRIVATE_IP
+          wings_new_data_volume: true
+          wings_initialize_empty_volume: false # explicitly authorize the identified blank new disk
+        wings-02:
+          ansible_host: REPLACE_PRIVATE_IP
+          wings_new_data_volume: true
+          wings_initialize_empty_volume: false
+        wings-03:
+          ansible_host: REPLACE_PRIVATE_IP
+          wings_new_data_volume: true
+          wings_initialize_empty_volume: false
+        wings-04:
+          ansible_host: 10.10.50.10
+          wings_new_data_volume: false
+          retained_data_reviewed: false
+    subnet_routers:
+      hosts:
+        wings-04:
+          tailscale_version: REPLACE_VERIFIED_PACKAGE_VERSION
+          tailscale_routes: [REPLACE_ACTUAL_OCI_SUBNET_CIDR]
+          tailscale_tag: tag:oci-router
+          tailscale_auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"
+          router_tailnet_admin_sources: ["100.66.202.74/32"]
+    homelab:
+      hosts:
+        pos:
+          ansible_host: 192.168.1.28
+          ansible_user: pos
+        optiplex:
+          ansible_host: 192.168.1.27
+          ansible_user: run-barry-run
+          ansible_become_method: doas
+      vars:
+        oci_subnet_cidrs: [REPLACE_ACTUAL_OCI_SUBNET_CIDR]

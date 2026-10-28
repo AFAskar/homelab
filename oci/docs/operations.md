@@ -1,0 +1,63 @@
+# Operations and recovery
+
+These are procedures to run after prerequisites/approval; they are not evidence of deployment. Use the same root, OCI profile/region and private DNS for all operations.
+
+## Private administration and DNS
+
+Use `ssh ubuntu@10.10.50.10` for Thor once its key is recovered and route approved. Other Linux private IPs and Windows IP come from `terraform output`. Administrators accept the approved OCI routes (`tailscale set --accept-routes=true` on Linux). Only the router runs Tailscale; Wings peers and Windows do not.
+
+Merge `ansible/tailscale/policy.example.hujson` with existing tailnet policy. Replace placeholders with actual node destinations and admin identities; add policy tests covering allowed admin access, allowed pos/optiplex API/metrics, and denied ordinary users. Approve routes explicitly in the admin console. If using autoApprovers, scope to `tag:oci-router` and only the two actual subnets; do not grant all subnet advertisements. Manage device expiry and persist tailscaled. Use a tagged scoped one-use authentication key for enrollment; no key belongs in state or user-data. Standard SNAT sees the router /32 at OCI destinations; return traffic uses connection tracking. Do not add a default route through OCI.
+
+`render-inventory.py` writes a private `wings.hosts` mapping from real state. Add those names to existing home DNS and CoreDNS's `home.internal` host mapping, then test resolution from a Panel pod and browser. The generated file is input for reviewed DNS configuration, not an automatically deployed CoreDNS replacement. `pelican.home.internal` resolves to Traefik at home, and to 10.10.50.10 only on OCI guests. The callback Caddy role connects directly to pos's existing tailnet IP with TLS SNI `pelican.home.internal`; no home LAN subnet route is assumed.
+
+Use existing PKI procedures in `docs/pki-bootstrap.md` to issue/renew Wings SAN certs and the callback proxy cert. Store per-node config/tls material only in ignored `oci/ansible/secrets/<node>/`. CA private keys stay in the existing secure PKI workflow. Install the homelab root CA on browser clients. Panel mounts a trusted CA bundle; Wings installs the root to Ubuntu trust. Do not use `curl -k`, PHP `verify=false`, browser certificate bypass or plaintext Wings for acceptance. Renew before expiry, rerun Ansible and verify websocket console connections after renewal.
+
+## Panel and Wings enrollment
+
+Manually sync Argo `pelican` after review; no automated sync/prune is enabled. Check PVC placement and patch its bound PV reclaim policy to Retain before production use. SQLite DB, `.env`/APP_KEY and logs share the 10 GiB PVC; keep off-node backups. On first install open `https://pelican.home.internal/installer`, select supported SQLite/file cache+sessions/database queue and create a secure admin account. Verify migrations, `queue-worker` and `supercronic` via supervisor status in the official image. Do not add parallel workers/schedulers unless deliberately changing this deployment.
+
+Create four Panel nodes named wings-01..04. Use private FQDNs `wings-NN.oci.home.internal`, HTTPS daemon 8080, SFTP 2022, and actual memory/disk capacities with OS headroom (do not allocate every byte of RAM to games). Paid node game-data directory must be `/srv/pelican/volumes`; Thor retains its discovered safe data path. Save each Panel-generated config locally, mode 0600. Verify `remote` points to `https://pelican.home.internal`, TLS file paths under `/etc/pelican/tls`, and Docker network CIDR does not overlap OCI/LAN/pod/service/tailnet ranges. Ansible checks paid data path and TLS and never commits enrollment tokens.
+
+Allocate TCP/25565 on the node's actual private VNIC IP. OCI public IP is external NAT, not the Linux bind address. Store mappings from Panel allocation to public endpoint; ephemeral paid public IPs may change on replacement. Port changes require matching Panel allocations, OCI NSGs and DOCKER-USER allowed ports. SSH/RDP/API/exporter/SFTP stay private. Verify public games using an external client independent of the tailnet. Check native ARM manifest/egg for Thor; x86-only games belong on paid AMD nodes.
+
+## Backups and restores
+
+No automatic paid snapshots are enabled. An operator initially selects up to ~50 GB, stops/quiesces those game servers using Panel, and makes consistent archives. For Panel, snapshot SQLite through its `.backup` operation or stop Panel before archiving; copy `.env`/APP_KEY and application storage too. Encrypt archives locally before upload (for example age to the existing recovery recipient); never export the CA private key casually. Example upload of an existing consistent encrypted archive:
+
+```bash
+BACKUP_QUIESCED=yes oci/scripts/backup.sh /secure/path/selected.tar.age
+```
+
+Run this daily through an approved existing automation/host scheduler; installation of a recurring backup job is still pending. The script uses the Terraform-managed private backup bucket and prints a checksum. Use a bucket-scoped Object writer (Create/Inspect), separate restore-reader, and an administrator for approved cleanup. No public objects, pre-authenticated requests, anonymous access, or OCI API private key installed on Wings. An existing operator with scoped CLI credentials performs the upload. Bucket IAM creation is a prerequisite until identity-domain group ownership is confirmed.
+
+Retention target: 14 daily selected backups, with a weekly size check to stay near 50 GB average. No automatic deletion or locked immutable retention is configured; growing data changes cost, and deletion requires approval. Persist archive checksums with an off-bucket recovery record. Test restore by downloading a named object (`oci os object get`), checking its stored SHA256, decrypting into a **new empty staging directory**, and comparing files. Restore game data to a stopped server with correct ownership; restore Panel DB, APP_KEY and storage together. Never overwrite live data to test recovery. A complete automated scheduled/restore-tested backup system remains pending live access.
+
+Paid game data survives reboot through an ext4 UUID mount. Wings RequiresMountsFor prevents accidental use of an unmounted boot directory. Compute/volume prevent_destroy guards against accidental Terraform destruction; preservation imports do not relocate existing Thor data. Rebuilding a paid node requires a reviewed instance-only replacement while preserving data/boot disks, then reattachment and UUID remount; do not remove protection or recreate disks blindly. Reuse discovered filesystems and never format an existing disk. Full disaster recreation requires network import/state recovery first and a confirmed Windows image workflow; imported freeze rules must be reconciled before claiming a complete greenfield recreation.
+
+## Windows lifecycle
+
+Windows deployment is blocked; no Windows instance exists and no RDP/start-stop test has been run. `prepare-image.sh` and `import-image.sh` are reusable conversion/import stages requiring explicit compatibility evidence and billable-storage approval, not a completed Windows installer. `first-boot.ps1` checks Windows 11/TPM/Secure Boot, sets the built-in admin password from SecureString, enables NLA, and allows RDP only from router private IPs. Initial execution uses a supported image-build console. Keep final credentials in a password manager, rotate after deployment, and never rely on OCI Windows Server password retrieval for a custom Windows 11 image.
+
+```bash
+oci/scripts/status-windows.sh
+OCI_APPROVE_BILLABLE_START=yes oci/scripts/start-windows.sh # only after explicit approval
+oci/scripts/stop-windows.sh # graceful SOFTSTOP, never terminate/reset
+```
+
+These read the exact identity/profile/region from Terraform outputs, not display-name search. Terraform deliberately omits instance `state` so stops are not undone by a later apply. Use RDP to the **private** Windows IP. Verify interactive login and NLA before accepting deployment, test start/stop/status, then leave STOPPED. The 200 GB boot disk, source upload and custom image keep accruing storage charges while stopped. SOFTSTOP waits for guest shutdown and never falls back to a forced stop. Rebuild/wiping requires explicit approval, a reviewed volume/image plan, and password rotation; “stop” does not wipe data.
+
+## Monitoring and troubleshooting
+
+Existing Prometheus is reused. Ansible enables node-exporter systemd metrics for Wings/Docker/tailscaled/Caddy and bounded journald logs (200 MB/14 days). The monitoring manifest provides a private exporter ServiceMonitor and alerts; populate its EndpointSlice from actual Terraform outputs before claiming coverage. No paid monitoring VM is added. `healthcheck.py` checks actual private TCP routes and certificate-verified Wings API responses; it does not register nodes or prove game availability. Run it from the administrator and repeat equivalent tests inside Panel pods on **both** k3s nodes. Monitor disk space, load/memory and systemd services, plus actual endpoint/game probes. Tailnet peer “online” alone does not prove subnet-route reachability.
+
+Inspect `tailscale status`, approved routes/grants, `ip route get <private-ip>`, then router `sysctl net.ipv4.ip_forward`, `iptables-save`, destination security lists/NSGs and host rules. On Kubernetes, inspect node route acceptance, scoped pod MASQUERADE, CNI policies and DNS. For Wings, inspect `systemctl status docker wings`, `journalctl -u wings`, `findmnt /srv/pelican`, `blkid`, certificate SAN/expiry, Panel FQDN, callback proxy and websocket errors. A 401/403 from Wings can prove verified TLS reachability but not correct Panel enrollment.
+
+For RDP, verify Windows RUNNING, subnet route TCP/3389, NLA, TermService, router-scoped Windows Firewall rule and private NSG. Do not add public RDP to debug. For games, confirm listening allocation, private bind IP, external public IP, OCI protocol/port, DOCKER-USER rules, native image architecture and an actual external client connection.
+
+Reconcile Usage API cost daily against the credit Console, account for reporting lag and trial expiration, and use `estimate-cost.sh` for allocation changes. Budgets alert monthly actual spend at €200/225/240, not remaining credit or lifetime consumption. A scheduled daily credit/lifecycle probe and actual alert delivery remain pending credentials/approval. Follow the validation checklist before marking monitoring accepted.
+
+## Access recovery and teardown
+
+If Thor fails, use verified OCI serial console/recovery access (requires an authorized console key and IAM) to repair its Tailscale/service/network settings while preserving disks and public rules. Existing public SSH is retained until private SSH and recovery are proven. After lockdown, do not reopen world-wide SSH/RDP; use approved console recovery. As an optional failover, run the same router role on an existing paid Wings node, approve the same subnets, tag it, and add its private /32 to all OCI/host access rules. Use matching split DNS/callback proxy failover; do not advertise a second router without testing SNAT sources and route selection. No extra paid router is required.
+
+Restore state from the versioned state bucket only with no active writer and after inspecting lineage/serial. Do not force-push state or delete lock objects to bypass another operation. `terraform destroy` is intentionally blocked by retention protections. Safe teardown needs an explicit OCID-level approval: stop games, export consistent data, verify restores, migrate tailnet access first, stop Windows, then review per-resource destruction. Retain Thor, its disk, shared networking and state/backup buckets unless expressly included in the approved plan. Untracked/orphaned volumes and imported-image objects can continue billing; state removal alone does not stop charges.

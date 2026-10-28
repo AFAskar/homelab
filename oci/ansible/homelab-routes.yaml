@@ -1,0 +1,71 @@
+# Run separately only after route/grant review; does not enroll new tailnet nodes.
+- name: Enable OCI subnet reachability from existing Kubernetes nodes and pods
+  hosts: homelab
+  become: true
+  tasks:
+    - name: Require explicit reviewed routes
+      ansible.builtin.assert:
+        that:
+          - oci_subnet_cidrs | length > 0
+          - ansible_facts.distribution in ['AlmaLinux', 'Alpine']
+    - name: Read route acceptance preference
+      ansible.builtin.command: tailscale debug prefs
+      register: homelab_prefs
+      changed_when: false
+      no_log: true
+    - name: Accept approved subnet routes
+      ansible.builtin.command: tailscale set --accept-routes=true
+      when: not (homelab_prefs.stdout | from_json).RouteAll
+      changed_when: true
+    - name: Install pod-to-tailnet SNAT script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/pelican-pod-routes
+        mode: '0750'
+        content: |
+          #!/bin/sh
+          set -eu
+          {% for cidr in oci_subnet_cidrs %}
+          iptables -t nat -C POSTROUTING -s 10.42.0.0/16 -d {{ cidr }} -o tailscale0 -j MASQUERADE 2>/dev/null || \
+            iptables -t nat -I POSTROUTING 1 -s 10.42.0.0/16 -d {{ cidr }} -o tailscale0 -j MASQUERADE
+          {% endfor %}
+    - name: Persist routing on systemd host
+      when: ansible_facts.service_mgr == 'systemd'
+      block:
+        - name: Write systemd unit
+          ansible.builtin.copy:
+            dest: /etc/systemd/system/pelican-pod-routes.service
+            mode: '0644'
+            content: |
+              [Unit]
+              Description=OCI pod subnet route SNAT
+              After=tailscaled.service k3s.service k3s-agent.service
+              [Service]
+              Type=oneshot
+              ExecStart=/usr/local/sbin/pelican-pod-routes
+              RemainAfterExit=yes
+              [Install]
+              WantedBy=multi-user.target
+        - name: Enable pod route persistence
+          ansible.builtin.systemd_service:
+            name: pelican-pod-routes
+            enabled: true
+            state: started
+            daemon_reload: true
+    - name: Persist routing on OpenRC host
+      when: ansible_facts.service_mgr == 'openrc'
+      block:
+        - name: Install local startup hook
+          ansible.builtin.copy:
+            dest: /etc/local.d/pelican-pod-routes.start
+            mode: '0750'
+            content: |
+              #!/bin/sh
+              /usr/local/sbin/pelican-pod-routes
+        - name: Enable OpenRC local service
+          ansible.builtin.service:
+            name: local
+            enabled: true
+            state: started
+    - name: Apply idempotent scoped SNAT rules
+      ansible.builtin.command: /usr/local/sbin/pelican-pod-routes
+      changed_when: false

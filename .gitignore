@@ -4,3 +4,21 @@
 pki/*.key
 pki/*.csr
 pki/*.srl
+
+# OCI infrastructure: local inputs, plans/state, raw discovery and guest secrets
+!oci/**/*.md
+oci/**/.terraform/
+oci/**/*.tfstate*
+oci/**/*.tfplan
+oci/**/*.tfvars
+oci/**/backend.hcl
+oci/inventory/
+oci/ansible/inventory.yaml
+oci/ansible/secrets/
+oci/ansible/collections/
+oci/windows/work/
+oci/**/*.qcow2
+oci/**/*.vmdk
+oci/**/*.vhd*
+oci/**/*.iso
+**/__pycache__/
