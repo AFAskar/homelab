@@ -24,6 +24,9 @@ resource "oci_core_instance" "wings" {
     ssh_authorized_keys = var.ssh_public_key
     user_data           = filebase64("${path.module}/../cloud-init/wings.yaml")
   }
+  instance_options {
+    are_legacy_imds_endpoints_disabled = true
+  }
   preserve_boot_volume = true
   freeform_tags        = local.tags
   depends_on           = [terraform_data.review_gate, terraform_data.network_gate]
