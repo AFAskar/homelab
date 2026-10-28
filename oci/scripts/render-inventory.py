@@ -21,11 +21,14 @@ children['subnet_routers']['hosts']['wings-04']['tailscale_routes'] = net['adver
 children['homelab']['vars']['oci_subnet_cidrs'] = net['advertised_routes']
 os.umask(0o077)
 path=root/'ansible/inventory.yaml'
-if path.exists(): raise SystemExit('Refusing to overwrite existing inventory; reconcile manually.')
-path.write_text(yaml.safe_dump(inv,sort_keys=False))
+if path.exists():
+    print('Kept existing private inventory; reconcile changed instance addresses manually.')
+else:
+    path.write_text(yaml.safe_dump(inv,sort_keys=False))
+    print('Wrote private inventory; review package versions, users, TLS paths and preservation gates.')
 (root/'inventory').mkdir(exist_ok=True)
 (root/'inventory/wings.hosts').write_text('\n'.join(lines)+'\n')
-print('Wrote private inventory and DNS mapping. Review package versions, users, interface, TLS paths and preservation gates before use.')
+print('Refreshed private DNS mapping from Terraform outputs.')
 
 # Write actual monitoring targets for subsequent reviewed GitOps commit/sync.
 endpoint_path=root.parent/'kubernetes/pelican/manifests/wings-endpoints.yaml'
