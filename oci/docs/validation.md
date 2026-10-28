@@ -111,3 +111,10 @@ With explicit permission, MPMB was managed-saved, the isolated clone was tested,
 The clone independently booted its sole 80 GiB system disk through VirtIO with a VirtIO NIC, TPM ready and Secure Boot enabled. SSH over isolated localhost port 2223 succeeded. Old driver Code 52 was fixed by installing catalog-verified VirtIO-Win 0.1.302 packages; no signature/Secure Boot bypass was used. `install-virtio.ps1` passed the Windows PowerShell parser; extraction and all Windows shell scripts passed ShellCheck. The clone was shut down afterward. Private fixture/profile sanitization and generalization are still agent work, not a request for replacement media from the user.
 
 Offline post-import configuration checks pass for fresh schema creation, existing-schema reuse/preservation (including CLI response/input key conversion) and rejection of an oversized image before mutation. Installed OCI CLI help and provider/SDK schema were inspected. No metadata write, image upload/import, OCI boot or private RDP test occurred.
+
+
+## Second CodeRabbit review
+
+Fixed all five new findings in separate commits: restart Wings after CA rotation only after its unit exists; reconcile generated routes in existing operator inventory; require the approved final image SHA256; handle the OCI CLI object-list `data` array and missing empty data; and put Windows OS metadata inside the supported image-source details. The exact import invocation passes the installed CLI parser using offline skeleton generation. Retry regression fixtures now match the actual CLI response shape, checked against its installed implementation. Inventory preservation/reconciliation and production Ansible lint pass. No OCI writes occurred.
+
+The native EUR tariff was independently retrieved and now drives credit-consumption estimates: €230.42 conditional baseline, €19.58 remaining from a full €250 after 730 hours, about 33.00 days. USD spot conversion remains a labelled comparison, not the EUR billing estimate. The smaller disputed A1 allowance raises the baseline to €255.51 before images/other costs; do not apply that over-budget scenario without an approved change.
