@@ -33,7 +33,7 @@ Wings on non-router nodes needs callbacks to Panel but has no Tailscale client. 
 
 ## TLS, browsers and game ports
 
-Panel: `https://pelican.home.internal`, ingress TLS from existing `homelab-ca`. Wings: `wings-01.oci.home.internal` through `wings-04.oci.home.internal`, HTTPS 8080 with per-node SAN certificates from the same CA. Browsers use those private FQDNs for websocket console/file features, so administrators need approved routes, DNS and CA trust too. Panel's image gets a combined CA bundle, with the existing public root certificate copied into its manifest ConfigMap; keep this copy aligned when rotating PKI.
+Panel: `https://pelican.home.internal`, ingress TLS from existing `homelab-ca`. Wings: `wings-01.oci.home.internal` through `wings-04.oci.home.internal`, HTTPS 8080 with per-node SAN certificates from the same CA. Browsers use those private FQDNs for websocket console/file features, so administrators need approved routes, DNS and CA trust too. Panel's image gets a combined CA bundle, with a ConfigMap generated directly from `pki/homelab-root-ca.crt` through the shared `pki/` Kustomize base. There is one CA certificate source; no copied certificate to maintain.
 
 API, SSH, SFTP (2022) and node-exporter (9100) are private. No public Wings API is needed in this topology. Only TCP/25565 is allocated publicly initially, independently on every node. Configure allocations using each node's actual private bind IP; OCI public IPv4 NAT forwards to it. Additional games need explicit matching Panel allocations, Terraform TCP/UDP rules and Ansible firewall ports. Docker forwarding is filtered in DOCKER-USER; UFW alone would not cover published game ports. IPv6 administration is blocked by host rules and no public IPv6 ingress is provisioned.
 
