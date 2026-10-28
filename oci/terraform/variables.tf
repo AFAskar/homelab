@@ -79,7 +79,7 @@ variable "discovery_reviewed" {
   default     = false
 }
 variable "windows_compatibility_verified" {
-  description = "Must remain false until custom Windows 11 TPM2/UEFI support and imported-image compatibility with the requested 200GB boot volume are verified."
+  description = "Must remain false until custom Windows 11 TPM2/UEFI support and imported-image compatibility with the requested 100GB boot volume are verified."
   type        = bool
   default     = false
 }

@@ -17,9 +17,9 @@ flowchart LR
 |---|---|---|---|---|
 | wings-01..03 each | VM.Standard.E6.Flex | 2 / 16 GB | 50 / 200 GB | x86-64 Ubuntu 26.04 |
 | wings-04 (existing Thor) | VM.Standard.A1.Flex | existing 4 / 24 GB | existing 100 / none separate | ARM64 Ubuntu 26.04 Minimal |
-| win11-lab | VM.Standard.E4.Flex | 2 / 16 GB | 200 / none | Windows 11 x86-64; blocked pending supported image+TPM path |
+| win11-lab | VM.Standard.E4.Flex | 2 / 16 GB | 100 / none | Windows 11 x86-64; blocked pending supported image+TPM path |
 
-Paid storage is exactly 950 GB; Thor's 100 GB is separate. All disks stay at the selected 10 VPU balanced tier. Prevent-destroy protects compute/volumes/network; ignored imported launch fields preserve actual settings. This preservation phase intentionally avoids changing Thor's OCI/guest hostname; use `wings-04` in Panel and inventory.
+Paid storage is exactly 850 GB; Thor's 100 GB is separate. All disks stay at the selected 10 VPU balanced tier. Prevent-destroy protects compute/volumes/network; ignored imported launch fields preserve actual settings. This preservation phase intentionally avoids changing Thor's OCI/guest hostname; use `wings-04` in Panel and inventory.
 
 ## Routing and sources
 

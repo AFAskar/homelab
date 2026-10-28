@@ -27,7 +27,7 @@ for n in range(1,4):
  rows[f'wings-0{n} compute']=D(a.hours)*(2*rate('B111129')+16*rate('B111130'))
  rows[f'wings-0{n} 250GB balanced']=250*(rate('B91961')+10*rate('B91962'))
 rows['win11 compute']=D(a.windows_hours)*(2*rate('B93113')+16*rate('B93114'))
-rows['win11 200GB balanced, including stopped hours']=200*(rate('B91961')+10*rate('B91962'))
+rows['win11 100GB balanced, including stopped hours']=100*(rate('B91961')+10*rate('B91962'))
 rows['50GB backups, no free allowance deducted']=50*rate('B91628')
 rows['custom image storage'] = a.image_gb*rate('B91628')
 rows['uploaded source image storage'] = a.upload_gb*rate('B91628')

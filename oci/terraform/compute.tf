@@ -64,7 +64,7 @@ resource "oci_core_instance" "windows" {
   source_details {
     source_type             = "image"
     source_id               = var.windows_image_ocid
-    boot_volume_size_in_gbs = 200
+    boot_volume_size_in_gbs = 100
     boot_volume_vpus_per_gb = 10
   }
   launch_options {
@@ -85,7 +85,7 @@ resource "oci_core_instance" "windows" {
     prevent_destroy = true
     precondition {
       condition     = var.windows_compatibility_verified
-      error_message = "Windows 11 blocked: verify custom-image TPM2/UEFI support and the imported image boot-volume requirements before proceeding. The requested allocation remains 200GB."
+      error_message = "Windows 11 blocked: verify custom-image TPM2/UEFI support and the imported image boot-volume requirements before proceeding. The requested allocation remains 100GB."
     }
     # Do not manage state=RUNNING: CLI start/stop must not be undone by Terraform.
   }
