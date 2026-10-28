@@ -8,6 +8,8 @@ get = lambda k: d[k]['value']
 inv = yaml.safe_load((root/'ansible/inventory.example.yaml').read_text())
 net = get('network')
 router = str(ipaddress.IPv4Address(net['router_private_ip']))
+routes = [str(ipaddress.IPv4Network(cidr)) for cidr in net['advertised_routes']]
+if not routes: raise SystemExit('Terraform must supply at least one actual OCI route.')
 inv['all']['vars']['router_private_ip'] = router
 inv['all']['vars']['admin_source_cidrs'] = [router+'/32']
 inv['all']['vars']['router_source_cidrs'] = [router+'/32']
@@ -17,12 +19,19 @@ for name, v in get('wings_instances').items():
     ip = str(ipaddress.IPv4Address(v['private_ip']))
     children['wings']['hosts'][name]['ansible_host'] = ip
     lines.append(f'{ip} {name}.oci.home.internal')
-children['subnet_routers']['hosts']['wings-04']['tailscale_routes'] = net['advertised_routes']
-children['homelab']['vars']['oci_subnet_cidrs'] = net['advertised_routes']
+children['subnet_routers']['hosts']['wings-04']['tailscale_routes'] = routes
+children['homelab']['vars']['oci_subnet_cidrs'] = routes
 os.umask(0o077)
 path=root/'ansible/inventory.yaml'
 if path.exists():
-    print('Kept existing private inventory; reconcile changed instance addresses manually.')
+    existing = yaml.safe_load(path.read_text())
+    current = existing['all']['children']
+    for group in ['subnet_routers', 'thor_bootstrap']:
+        for host in current.get(group, {}).get('hosts', {}).values():
+            host['tailscale_routes'] = routes
+    current['homelab'].setdefault('vars', {})['oci_subnet_cidrs'] = routes
+    path.write_text(yaml.safe_dump(existing, sort_keys=False))
+    print('Reconciled generated OCI subnet routes; kept operator settings. Review instance addresses manually.')
 else:
     path.write_text(yaml.safe_dump(inv,sort_keys=False))
     print('Wrote private inventory; review package versions, users, TLS paths and preservation gates.')
