@@ -1,48 +1,55 @@
 {
-  "retrieved_utc": "2026-10-28T20:36:55.839236+00:00",
-  "pricing_source": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD",
-  "prices_updated": "2026-10-08T14:38:16.165Z",
+  "retrieved_utc": "2026-10-28T21:26:14.710688+00:00",
+  "pricing_sources": {
+    "USD": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD",
+    "EUR": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=EUR"
+  },
+  "prices_updated": {
+    "USD": "2026-10-08T14:38:16.165Z",
+    "EUR": "2026-10-08T14:38:16.165Z"
+  },
   "fx_source": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
   "fx_date": "2026-10-28",
   "usd_per_eur": "1.1133",
   "runtime_hours": 730,
   "windows_hours": 120,
+  "billing_currency": "EUR",
   "rows": {
     "wings-01 compute": {
       "USD": "67.16",
-      "EUR": "60.33"
+      "EUR": "62.46"
     },
     "wings-01 250GB balanced": {
       "USD": "10.62",
-      "EUR": "9.54"
+      "EUR": "9.88"
     },
     "wings-02 compute": {
       "USD": "67.16",
-      "EUR": "60.33"
+      "EUR": "62.46"
     },
     "wings-02 250GB balanced": {
       "USD": "10.62",
-      "EUR": "9.54"
+      "EUR": "9.88"
     },
     "wings-03 compute": {
       "USD": "67.16",
-      "EUR": "60.33"
+      "EUR": "62.46"
     },
     "wings-03 250GB balanced": {
       "USD": "10.62",
-      "EUR": "9.54"
+      "EUR": "9.88"
     },
     "win11 compute": {
       "USD": "8.88",
-      "EUR": "7.98"
+      "EUR": "8.26"
     },
     "win11 100GB balanced, including stopped hours": {
       "USD": "4.25",
-      "EUR": "3.82"
+      "EUR": "3.95"
     },
     "50GB backups, no free allowance deducted": {
       "USD": "1.28",
-      "EUR": "1.15"
+      "EUR": "1.19"
     },
     "custom image storage": {
       "USD": "0.00",
@@ -62,15 +69,17 @@
     }
   },
   "total_usd": "247.7600",
-  "total_eur": "222.55",
-  "remaining_after_month_eur": "27.45",
-  "credit_days_at_average_burn": "34.17",
+  "total_eur": "230.42",
+  "usd_list_converted_to_eur_for_comparison_only": "222.55",
+  "remaining_after_month_eur": "19.58",
+  "credit_days_at_average_burn": "33.00",
   "assumptions": [
+    "USD and EUR use their own official list tariffs; EUR credit consumption is not spot-converted USD",
     "No free storage allowance double-counted",
-    "wings-04 costs unknown until inventory; assumes eligibility retained",
+    "wings-04 assumes retained eligibility; smaller documented allowance must be evaluated separately",
     "Image/source storage sizes unknown unless supplied",
-    "Egress and other tenancy spend unknown; extra-usd must include them",
+    "Egress and other tenancy spend unknown; supply measured extras",
     "Trial expiration and actual credit balance unknown",
-    "Taxes and regional contract prices not established"
+    "Taxes and account contract discounts not established"
   ]
 }
