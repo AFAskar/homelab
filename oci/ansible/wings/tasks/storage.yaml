@@ -27,6 +27,25 @@
       - data_device.stdout | length > 0
       - data_signature.rc == 0 or wings_initialize_empty_volume
     fail_msg: Blank disk requires explicit authorization and verified volume/device identity. Existing disks are never reformatted.
+- name: Check all disk signatures before initialization
+  ansible.builtin.command:
+    argv: [wipefs, --no-act, --noheadings, --output, TYPE, "{{ data_device.stdout }}"]
+  register: data_all_signatures
+  changed_when: false
+  when: wings_initialize_empty_volume and data_signature.rc == 2
+- name: Check partition table before initialization
+  ansible.builtin.command:
+    argv: [lsblk, --nodeps, --noheadings, --output, PTTYPE, "{{ data_device.stdout }}"]
+  register: data_partition_table
+  changed_when: false
+  when: wings_initialize_empty_volume and data_signature.rc == 2
+- name: Refuse to initialize any disk with existing metadata
+  ansible.builtin.assert:
+    that:
+      - data_all_signatures.stdout | trim | length == 0
+      - data_partition_table.stdout | trim | length == 0
+    fail_msg: Disk contains a filesystem or partition table; initialization is forbidden.
+  when: wings_initialize_empty_volume and data_signature.rc == 2
 - name: Initialize only blank authorized data disk
   community.general.filesystem:
     dev: "{{ data_device.stdout }}"
