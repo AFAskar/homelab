@@ -40,7 +40,7 @@ Bootstrap one OAuth trust credential in the existing tailnet with **Policy File 
 ```bash
 export TAILSCALE_OAUTH_CLIENT_ID="file:$PWD/oci/ansible/secrets/tailscale-client-id"
 export TAILSCALE_OAUTH_CLIENT_SECRET="file:$PWD/oci/ansible/secrets/tailscale-client-secret"
-terraform -chdir=oci/terraform plan -out=review.tfplan
+terraform -chdir=oci/terraform plan -target=tailscale_acl.tailnet -out=policy-review.tfplan
 ```
 
 Use the protected OCI backend before authoritative import/apply. An isolated targeted policy plan may be reviewed before the full OCI deployment is ready; this is a bootstrap exception, not the routine deployment workflow. An ACL plan is validation/review only. Obtain access-change approval before applying its policy update. The browser is used for initial credential bootstrap and recovery, not routine policy edits. Its unsaved preview was discarded; the live allow-all policy is unchanged.
