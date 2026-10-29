@@ -21,7 +21,6 @@ if image['size-in-mbs'] > 100*1024:
 print(image['compartment-id'])
 PY
 )
-oci compute image update --image-id "$image_id" --operating-system-version Windows11 --force >/dev/null
 oci compute image-capability-schema list --image-id "$image_id" --compartment-id "$compartment" --all > "$work/schemas.json"
 # Preserve unrelated existing capability overrides when updating.
 schema_id=$(python3 - "$work/schemas.json" "$root/image-capabilities.json" "$work/schema.json" <<'PY'
@@ -37,10 +36,15 @@ json.dump(schema,open(sys.argv[3],'w'))
 print(items[0]['id'] if items else '')
 PY
 )
+if [[ -z $schema_id ]]; then
+  global_version=$(oci compute global-image-capability-schema list --all --query 'data[0]."current-version-name"' --raw-output)
+  [[ -n $global_version && $global_version != null ]] || { echo 'Cannot determine the current global image schema version.' >&2; exit 2; }
+fi
+oci compute image update --image-id "$image_id" --operating-system-version Windows11 --force >/dev/null
 if [[ -n $schema_id ]]; then
   oci compute image-capability-schema update --image-capability-schema-id "$schema_id" --schema-data "file://$work/schema.json" --force
 else
-  oci compute image-capability-schema create --image-id "$image_id" --compartment-id "$compartment" --schema-data "file://$work/schema.json"
+  oci compute image-capability-schema create --image-id "$image_id" --compartment-id "$compartment" --global-image-capability-schema-version-name "$global_version" --schema-data "file://$work/schema.json"
 fi
 oci compute image-shape-compatibility-entry add --image-id "$image_id" --shape-name VM.Standard.E4.Flex --force
 # Metadata acceptance is not a successful boot. Verify TPM2, Secure Boot, drivers
