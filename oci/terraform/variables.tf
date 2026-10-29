@@ -79,7 +79,7 @@ variable "discovery_reviewed" {
   default     = false
 }
 variable "windows_compatibility_verified" {
-  description = "Set after reviewing accepted Windows 11 image/E4 TPM2/UEFI capabilities and the 100GB boot minimum; live boot/RDP acceptance follows the approved first launch."
+  description = "Keep false until a documented service-supported Windows 11 custom-image/E4 Secure Boot/TPM2/UEFI path and the 100GB boot minimum are established. Metadata acceptance alone is insufficient; live boot/RDP follows a separate approved launch."
   type        = bool
   default     = false
 }
