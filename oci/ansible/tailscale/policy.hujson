@@ -151,6 +151,18 @@
       "ip": [
         "tcp:443"
       ]
+    },
+    {
+      "src": [
+        "autogroup:member"
+      ],
+      "dst": [
+        "pos"
+      ],
+      "ip": [
+        "tcp:53",
+        "udp:53"
+      ]
     }
   ],
   "ssh": [],
@@ -300,6 +312,28 @@
       "deny": [
         "wings-04-private:8080",
         "10.10.10.20:3389"
+      ]
+    },
+    {
+      "src": "other-member-desktop",
+      "proto": "udp",
+      "accept": [
+        "pos:53"
+      ],
+      "deny": [
+        "pos:5353",
+        "wings-04-private:8080"
+      ]
+    },
+    {
+      "src": "owner-phone",
+      "proto": "tcp",
+      "accept": [
+        "pos:53"
+      ],
+      "deny": [
+        "pos:22",
+        "pos:443"
       ]
     }
   ],

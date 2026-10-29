@@ -1,0 +1,15 @@
+{
+  "validated_utc": "2026-10-29T04:54:46.024467+00:00",
+  "scope": "Isolated targeted diagnostic plan; no authoritative state import or apply",
+  "resource": "tailscale_acl.tailnet",
+  "imports": 1,
+  "adds": 0,
+  "updates": 1,
+  "destroys": 0,
+  "provider": "tailscale/tailscale 0.29.3",
+  "policy_sha256": "734d9717dc5d89945e1889b2c55e1dbdf951948c32f88bcfb930d0a7ff74d212",
+  "policy_test_cases": 13,
+  "control_plane_policy_validation": "Passed during provider plan",
+  "live_policy_changed": false,
+  "negative_control": "A temporary forbidden accept test for pos:2375 was rejected by the Tailscale API; restored the valid candidate before the final plan"
+}
