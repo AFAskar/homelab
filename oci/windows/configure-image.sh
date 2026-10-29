@@ -48,4 +48,5 @@ else
 fi
 oci compute image-shape-compatibility-entry add --image-id "$image_id" --shape-name VM.Standard.E4.Flex --force
 # Metadata acceptance is not a successful boot. Verify TPM2, Secure Boot, drivers
-# and private RDP on the approved E4 instance before opening the Terraform gate.
+# and private RDP after the approved Terraform first launch. Open the gate only
+# after reviewing accepted image/shape capabilities and the boot-volume minimum.

@@ -15,7 +15,7 @@ variable "ubuntu_image_ocid" {
   type        = string
 }
 variable "windows_image_ocid" {
-  description = "Imported Windows 11 image. Required; deployment remains blocked by custom-image TPM compatibility."
+  description = "Imported Windows 11 image OCID; review accepted firmware, TPM and E4 capabilities before the approved first launch."
   type        = string
 }
 variable "ssh_public_key" {
@@ -79,7 +79,7 @@ variable "discovery_reviewed" {
   default     = false
 }
 variable "windows_compatibility_verified" {
-  description = "Must remain false until custom Windows 11 TPM2/UEFI support and imported-image compatibility with the requested 100GB boot volume are verified."
+  description = "Set after reviewing accepted Windows 11 image/E4 TPM2/UEFI capabilities and the 100GB boot minimum; live boot/RDP acceptance follows the approved first launch."
   type        = bool
   default     = false
 }
