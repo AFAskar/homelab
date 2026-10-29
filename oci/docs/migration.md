@@ -18,10 +18,17 @@ terraform -chdir=oci/terraform show image-bucket.tfplan
 terraform -chdir=oci/terraform apply image-bucket.tfplan
 ```
 
-Set `OCI_IMAGE_NAMESPACE`/`OCI_IMAGE_BUCKET` from `terraform output -json windows_image_bucket`, and `OCI_COMPARTMENT_OCID` to Ymir’s compartment **OCID**, not its display name: `export OCI_COMPARTMENT_OCID=ocid1.compartment.oc1..aaaaaaaavoznuamfvzwjj2n4ae3xbtgxkskv7kuqexsu4oqp3jxjmrj4proq`. Set `OCI_WIN11_COMPATIBILITY_EVIDENCE` to the reviewed local evidence file and `OCI_APPROVED_IMAGE_SHA256` to the exact digest above. Only within the approved image operation, keep the approval variable in scope for both scripts and capture the OCID only after successful import:
+Run from the repository root. Confirm the image bucket values with `terraform -chdir=oci/terraform output -json windows_image_bucket`. The following exports use the discovered tenancy's namespace, managed bucket and Ymir compartment **OCID**, not its display name. Keep every input exported so both child scripts receive it. Run the import/configuration commands only within the approved image operation:
 
 ```bash
 (
+  export OCI_CLI_PROFILE=DEFAULT
+  export OCI_CLI_REGION=me-riyadh-1
+  export OCI_IMAGE_NAMESPACE=axh0rk0bydbu
+  export OCI_IMAGE_BUCKET=homelab-win11-images
+  export OCI_COMPARTMENT_OCID=ocid1.compartment.oc1..aaaaaaaavoznuamfvzwjj2n4ae3xbtgxkskv7kuqexsu4oqp3jxjmrj4proq
+  export OCI_WIN11_COMPATIBILITY_EVIDENCE="$PWD/oci/docs/windows-image-validation.json"
+  export OCI_APPROVED_IMAGE_SHA256=c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881
   export OCI_APPROVE_IMAGE_IMPORT=yes
   IMAGE_OCID="$(oci/windows/import-image.sh oci/windows/work/win11-import.qcow2)" || exit 1
   oci/windows/configure-image.sh "$IMAGE_OCID"
