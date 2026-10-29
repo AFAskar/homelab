@@ -1,5 +1,5 @@
 {
-  "retrieved_utc": "2026-10-29T04:13:18.549602+00:00",
+  "retrieved_utc": "2026-10-29T04:35:57.770362+00:00",
   "pricing_sources": {
     "USD": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD",
     "EUR": "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=EUR"
@@ -14,6 +14,8 @@
   "runtime_hours": 730,
   "windows_hours": 120,
   "billing_currency": "EUR",
+  "assumed_starting_credit_eur": "250",
+  "credit_projection_notice": "Remaining-after-month and credit-days fields are projections from --remaining-eur, not balance reads; promotional expiry can occur earlier.",
   "rows": {
     "wings-01 compute": {
       "USD": "67.16",
