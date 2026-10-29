@@ -43,3 +43,10 @@ The script uses the `pos` Podman connection by default. Set
 - Validate each change before committing. Use a concrete commit message that
   explains the behavior changed; do not bundle unrelated review fixes.
 - Keep review fixes simple and follow existing repository conventions.
+
+# OCI Windows scope
+
+For the OCI environment, Windows licensing is handled by the user and excluded
+from infrastructure cost, feasibility and deployment analysis. Do not add
+licensing costs or licensing approval gates. Keep technical image, firmware,
+TPM, Secure Boot and access checks in scope.
