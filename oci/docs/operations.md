@@ -43,9 +43,18 @@ Install the homelab root CA on browser clients. Panel mounts a trusted CA bundle
 
 ## Panel and Wings enrollment
 
-Manually sync Argo `pelican` after review; no automated sync/prune is enabled. Check PVC placement and patch its bound PV reclaim policy to Retain before production use. SQLite DB, `.env`/APP_KEY and logs share the 10 GiB PVC; keep off-node backups. On first install open `https://pelican.home.internal/installer`, select supported SQLite/file cache+sessions/database queue and create a secure admin account. Verify migrations, `queue-worker` and `supercronic` via supervisor status in the official image. Do not add parallel workers/schedulers unless deliberately changing this deployment.
+Manually sync Argo `pelican` after approval; no automated sync/prune is enabled. Check PVC placement and set its PV reclaim policy to Retain. SQLite, `.env`, application storage and logs use the 10 GiB PVC. The SOPS-managed Kubernetes Secret supplies APP_KEY; include the effective Secret as well as SQLite in off-node backups.
 
-Create four Panel nodes named wings-01..04. Use private FQDNs `wings-NN.oci.home.internal`, HTTPS daemon 8080, SFTP 2022, and actual memory/disk capacities with OS headroom (do not allocate every byte of RAM to games). Paid node game-data directory must be `/srv/pelican/volumes`; Thor retains its discovered safe data path. Save each Panel-generated config locally, mode 0600. Verify `remote` points to `https://pelican.home.internal`, TLS file paths under `/etc/pelican/tls`, and Docker network CIDR does not overlap OCI/LAN/pod/service/tailnet ranges. Ansible checks paid data path and TLS and never commits enrollment tokens.
+From the repository root, initialize the pinned release through its supported schema/models/services:
+
+```bash
+python3 oci/scripts/export-node-certificates.py
+python3 oci/scripts/configure-panel.py --initialize --admin-email YOUR_ADMIN_EMAIL
+```
+
+Use `--initialize` on first setup or a reviewed schema update; it runs the release migrations and seeds without dropping tables. Ordinary reruns can omit it. The helper preserves existing administrator passwords, refuses to promote an existing non-admin account, preserves node tokens, checks existing node hostname/TLS/data paths, and saves secrets only in ignored mode-0600 files. Retrieve the bootstrap password privately from `oci/ansible/secrets/panel-admin.json` and store it in the password manager. It disables the web installer after initialization. The official image’s bundled queue worker and scheduler are reused; verify `queue-worker` and `supercronic` with `supervisorctl status`.
+
+The four private node names use HTTPS 8080 and SFTP 2022. Paid nodes reserve RAM/disk headroom with Panel limits of 14 GiB / 180 GiB; Thor uses 20 GiB / 80 GiB of its existing capacity. Paid game data is `/srv/pelican/volumes`; Thor uses `/var/lib/pelican/volumes`. Root CA trust, per-node certificates and non-overlapping Docker networks remain prerequisites. Config export uses `/etc/pelican/tls/` and the private Panel URL. No enrollment token is committed.
 
 Allocate TCP/25565 on the node's actual private VNIC IP. OCI public IP is external NAT, not the Linux bind address. Store mappings from Panel allocation to public endpoint; ephemeral paid public IPs may change on replacement. Port changes require matching Panel allocations, OCI NSGs and DOCKER-USER allowed ports. SSH/RDP/API/exporter/SFTP stay private. Verify public games using an external client independent of the tailnet. Check native ARM manifest/egg for Thor; x86-only games belong on paid AMD nodes.
 
