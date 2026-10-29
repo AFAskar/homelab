@@ -6,7 +6,7 @@ One Terraform root lives in `oci/terraform/`. It preserves Thor as logical `wing
 
 ## Tooling and authentication
 
-Use Terraform 1.12+ (OCI backend locking), OCI provider 9.11.0 (lockfile committed), OCI CLI, Python 3 with `oci` and `PyYAML`, Ansible with the pinned collections, kubectl, Kustomize/KSOPS 4.5.1, SOPS and age. `oci setup config` configures the default API-key profile; keep `~/.oci` and its private key readable only by you. The profile needs read access to identity, compute, networks, volumes, images, limits, budgets, usage and storage. Deployment additionally needs their create/update rights in Ymir. API tests do not prove all write permissions. Do not commit keys, raw discovery, plans, state, tfvars, images or Wings tokens.
+Use Terraform 1.12+ (OCI backend locking), OCI provider 9.11.0 and Tailscale provider 0.29.3 (lockfile committed), OCI CLI, Python 3 with `oci` and `PyYAML`, Ansible with the pinned collections, kubectl, Kustomize/KSOPS 4.5.1, SOPS and age. `oci setup config` configures the default API-key profile; keep `~/.oci` and its private key readable only by you. The profile needs read access to identity, compute, networks, volumes, images, limits, budgets, usage and storage. Deployment additionally needs their create/update rights in Ymir. API tests do not prove all write permissions. Do not commit keys, raw discovery, plans, state, tfvars, images or Wings tokens.
 
 ```bash
 export OCI_TENANCY_OCID=... # profile tenancy OCID
@@ -30,6 +30,20 @@ Allow group HomelabTerraform to read buckets in compartment Ymir where target.bu
 ```
 
 The state bucket is a bootstrap prerequisite outside this root so it survives infrastructure teardown. Reuse an approved existing bucket if available. Backup-bucket access belongs to a separate bucket-scoped writer/restore-reader identity, not public access keys or tenancy-wide credentials on Wings.
+
+## Tailnet policy as code
+
+The same Terraform root manages the existing tailnet’s complete policy using `tailscale_acl.tailnet`, with `ansible/tailscale/policy.hujson` as its single reviewed source. Provider 0.29.3 validates syntax and embedded tests against the Tailscale API during planning. An import block reads the existing policy before proposing a change; automatic overwrite is disabled. `prevent_destroy` and `reset_acl_on_destroy=false` protect against deleting ownership or restoring a default allow-all policy. Do not manage this same policy from a second root or an automatic console/GitOps writer.
+
+Bootstrap one OAuth trust credential in the existing tailnet with **Policy File read/write only**. Save its Client ID and secret in the ignored, owner-only `oci/ansible/secrets/tailscale-client-id` and `tailscale-client-secret` files (mode 0600), then configure the provider without putting secrets in Terraform inputs/state:
+
+```bash
+export TAILSCALE_OAUTH_CLIENT_ID="file:$PWD/oci/ansible/secrets/tailscale-client-id"
+export TAILSCALE_OAUTH_CLIENT_SECRET="file:$PWD/oci/ansible/secrets/tailscale-client-secret"
+terraform -chdir=oci/terraform plan -out=review.tfplan
+```
+
+Use the protected OCI backend before authoritative import/apply. An isolated targeted policy plan may be reviewed before the full OCI deployment is ready; this is a bootstrap exception, not the routine deployment workflow. An ACL plan is validation/review only. Obtain access-change approval before applying its policy update. The browser is used for initial credential bootstrap and recovery, not routine policy edits. Its unsaved preview was discarded; the live allow-all policy is unchanged.
 
 ## Guest configuration and GitOps
 

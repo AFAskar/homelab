@@ -55,3 +55,9 @@ import {
   to = oci_core_service_gateway.retained_service_gateway_0
   id = "ocid1.servicegateway.oc1.me-riyadh-1.aaaaaaaaugi4cb44fwy3a7ir2jgnhd7n3wgwzi55izvc346wxg4f733ddvfa"
 }
+
+# Imports the current policy for an explicit diff; does not silently overwrite it.
+import {
+  to = tailscale_acl.tailnet
+  id = "acl"
+}
