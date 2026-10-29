@@ -8,6 +8,7 @@ resources:
 - service.yaml
 - ingress.yaml
 - certificate.yaml
+- node-certificates.yaml
 - storage.yaml
 - monitoring.yaml
 - wings-endpoints.yaml
