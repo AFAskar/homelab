@@ -17,6 +17,13 @@
       ansible.builtin.command: tailscale set --accept-routes=true
       when: not (homelab_prefs.stdout | from_json).RouteAll
       changed_when: true
+    - name: Create local administration script directory on minimal hosts
+      ansible.builtin.file:
+        path: /usr/local/sbin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
     - name: Install pod-to-tailnet SNAT script
       ansible.builtin.copy:
         dest: /usr/local/sbin/pelican-pod-routes
