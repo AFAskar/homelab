@@ -1,0 +1,40 @@
+{
+  "recorded_utc": "2026-10-29T05:49:08.181798+00:00",
+  "artifact": "ignored oci/windows/work/win11-import.qcow2",
+  "sha256": "c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881",
+  "format": "qcow2",
+  "compat": "1.1",
+  "compression": "zlib",
+  "virtual_bytes": 85899345920,
+  "file_bytes": 17315330048,
+  "requested_boot_volume_gb": 100,
+  "guest": "Windows 11 Pro build 26200 x86-64",
+  "preparation": {
+    "source": "independent hash-verified offline MPMB checkpoint clone",
+    "source_disk_nvram_tpm_unchanged": true,
+    "signed_virtio_version": "0.1.302-1",
+    "copied_source_profile_and_fixtures_removed": true,
+    "installer_bypass_flags_removed": true,
+    "sysprep_generalize_shutdown_succeeded": true,
+    "free_clusters_cleared": true,
+    "offline_ntfs_mft_directory_log_pagefile_tails_wiped": true
+  },
+  "local_validation": {
+    "qemu_img_check": "pass",
+    "fresh_uefi_secure_boot_and_tpm2_first_boot": "pass",
+    "virtio_boot_disk_and_nic": "pass",
+    "persistent_admin_account": "winlab",
+    "nla_correct_password_exit": 0,
+    "nla_wrong_password_exit": 134,
+    "tls_server_certificate_fingerprint_pinned": true,
+    "network": "isolated QEMU user network; gateway/SNAT source 10.10.50.10",
+    "tested_copy_separate_from_unbooted_capture": true
+  },
+  "not_verified": [
+    "OCI upload/import capability acceptance",
+    "E4 secure first boot and image minimum boot volume",
+    "RDP through actual Tailscale subnet router",
+    "OCI lifecycle scripts and Terraform drift"
+  ],
+  "deployed": false
+}

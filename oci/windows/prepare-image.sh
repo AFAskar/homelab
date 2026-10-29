@@ -7,6 +7,6 @@ set -euo pipefail
 [[ -f $1 && ! -e $2 ]] || { echo 'Source must exist; destination must not exist.' >&2; exit 2; }
 umask 077
 qemu-img info "$1"
-qemu-img convert -p -O qcow2 "$1" "$2"
+qemu-img convert -p -c -O qcow2 "$1" "$2"
 qemu-img check "$2"
-echo 'Local conversion complete. OCI compatibility, sanitization, drivers and generalization still need verification before import.'
+echo 'Local conversion complete. Review sanitization/generalization evidence and OCI compatibility before approving import.'
