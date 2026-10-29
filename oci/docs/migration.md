@@ -2,6 +2,26 @@
 
 **No apply, authoritative import, cleanup, merge or live guest mutation has been executed.** Full deployment is blocked by Windows custom-image/TPM support, unapplied Thor private-listener/router migration, state-bucket bootstrap, and approved image upload/import/launch. Read the validation report before using these steps.
 
+## First approval stage: state and image preparation
+
+No compute launch is included in this stage. The prepared capture is `oci/windows/work/win11-import.qcow2`, SHA256 `c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881` (17,315,330,048 bytes; 80 GiB virtual). Review `windows-image-validation.json` before approval. Native EUR pricing conservatively budgets 86 GB custom image plus 18 GB upload at €2.47 per full month, plus state-object storage/requests. A €5 storage/request ceiling for this stage leaves room for small versioned state files; this is an approval bound, not an OCI-enforced cap. Stop and request a change if projected charges exceed it. No deletion is authorized.
+
+After explicit approval, create the dedicated private state bucket `homelab-tfstate` in Ymir / namespace `axh0rk0bydbu`, with Standard storage, versioning Enabled, and NoPublicAccess. Verify those settings and no PAR; initialize the real OCI backend with its identity. Existing API credentials already permit bootstrap; no new credential is requested. A dedicated bucket-scoped operator policy is documented in the README; do not place tenancy credentials on guests.
+
+Use the single Terraform root for the image-source bucket. The isolated read-only diagnostic plan proposes exactly one private bucket addition, no imports/updates/deletions and no compute or networking changes; see `image-bucket-plan-summary.json`. Regenerate and review this exceptional bootstrap plan against protected state before applying it:
+
+```bash
+terraform -chdir=oci/terraform plan -target=oci_objectstorage_bucket.windows_images -out=image-bucket.tfplan
+terraform -chdir=oci/terraform show image-bucket.tfplan
+# Only within the explicit state/image-stage approval, after confirming one
+# private bucket addition and no compute/network/destructive changes:
+terraform -chdir=oci/terraform apply image-bucket.tfplan
+```
+
+Set `OCI_IMAGE_NAMESPACE`/`OCI_IMAGE_BUCKET` from `terraform output -json windows_image_bucket`, and `OCI_COMPARTMENT_OCID` to Ymir. Set `OCI_WIN11_COMPATIBILITY_EVIDENCE` to the reviewed local evidence file and `OCI_APPROVED_IMAGE_SHA256` to the exact digest above. Only within the approved image operation, run `OCI_APPROVE_IMAGE_IMPORT=yes oci/windows/import-image.sh oci/windows/work/win11-import.qcow2`, capture the resulting custom-image OCID, then run the equally approved `configure-image.sh`. Inspect accepted image/shape capabilities and the boot minimum. These API checks determine whether the requested E4 first launch can proceed; a genuine incompatibility stops that stage for a concrete technical decision.
+
+The next approval stage is a complete saved infrastructure plan with current costs. Applying the restrictive tailnet policy/access migration also needs explicit access-change approval. Neither stage is authorized by the image/storage approval. Keep source images and Thor/shared infrastructure protected; cleanup and merge require their own explicit instruction.
+
 ## 1. Establish protected state and access
 
 1. Use Thor's confirmed Ubuntu account with the Bitwarden agent and `select-ssh-agent-key.py`; the private key must stay in the agent. Read-only guest inventory is complete. Preserve the existing Tailscale-only SSH listener and run the reviewed `bootstrap-router.yaml` through 100.89.233.80 to add the private listener before switching inventory to 10.10.50.10. Do not remove current keys or Tailscale connectivity. Record `lsblk -f`, `findmnt`, `du`, running containers/services, firewall rules, `/etc/fstab`, game/data directories and dependency owners. Do not print secrets. Securely back up important data before installing packages; obtain approval for any paid backup storage. Confirm Docker CE package conflicts before change.
@@ -12,7 +32,7 @@
 
 Official `import` blocks map Thor, its boot volume, Jotunheim VCN, both subnets, both route tables, both security lists, IGW, NAT and service gateway. Their real OCIDs are in `imports.tf`. Configurations freeze retained launch/network fields; existing attachments and DHCP remain in place and are referenced. Imported blocks are idempotent when already in state.
 
-Plan just the retained graph to prepare a review. Exceptional resource targeting is justified for preservation-only review; it is not a full deployment plan. A diagnostic copy with a temporary local backend was used for read-only planning in this task because the real backend could not authenticate; it is never used to deploy or maintain a second environment. Its initial plan reported **12 imports / 0 add / 0 change / 0 destroy**. Re-run after any configuration/discovery changes.
+Plan just the retained graph to prepare a review. Exceptional resource targeting is justified for preservation-only review; it is not a full deployment plan. A diagnostic copy with a temporary local backend was used for read-only planning in this task because its required private state bucket did not yet exist; it is never used to deploy or maintain a second environment. Its initial plan reported **12 imports / 0 add / 0 change / 0 destroy**. Re-run after any configuration/discovery changes.
 
 After approval and state initialization, the simplest state-only path is official CLI imports, one dependency at a time:
 

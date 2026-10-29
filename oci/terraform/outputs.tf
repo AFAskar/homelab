@@ -16,3 +16,10 @@ output "oci_profile" { value = var.oci_profile }
 output "router_additive_nsg_ids" {
   value = [oci_core_network_security_group.wings.id, oci_core_network_security_group.router.id]
 }
+
+output "windows_image_bucket" {
+  value = {
+    namespace = oci_objectstorage_bucket.windows_images.namespace
+    name      = oci_objectstorage_bucket.windows_images.name
+  }
+}

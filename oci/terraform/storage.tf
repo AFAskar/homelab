@@ -49,3 +49,16 @@ resource "oci_objectstorage_bucket" "backups" {
 }
 # No immutable retention lock and no automatic expiration/deletion. Review
 # size/retention externally; automatic deletion needs explicit authorization.
+
+# Bootstrap this bucket before importing the required Windows image. Keep its
+# source object private: the generalized image contains a bootstrap credential.
+resource "oci_objectstorage_bucket" "windows_images" {
+  compartment_id = var.compartment_ocid
+  namespace      = data.oci_objectstorage_namespace.this.namespace
+  name           = "homelab-win11-images"
+  access_type    = "NoPublicAccess"
+  storage_tier   = "Standard"
+  versioning     = "Disabled"
+  freeform_tags  = local.tags
+  lifecycle { prevent_destroy = true }
+}

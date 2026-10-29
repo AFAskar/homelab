@@ -1,0 +1,13 @@
+{
+  "scope": "read-only isolated diagnostic plan, not authoritative state or an apply",
+  "adds": 1,
+  "updates": 0,
+  "destroys": 0,
+  "imports": 0,
+  "resource": "oci_objectstorage_bucket.windows_images",
+  "name": "homelab-win11-images",
+  "access_type": "NoPublicAccess",
+  "storage_tier": "Standard",
+  "versioning": "Disabled",
+  "no_compute_or_network_changes": true
+}
