@@ -78,13 +78,31 @@
   register: router_prefs
   changed_when: false
   no_log: true
+- name: Advertise router tag through the supported up command
+  # `tailscale set` does not support --advertise-tags. Preserve the discovered
+  # non-default client settings when up requires the complete flag set.
+  ansible.builtin.command:
+    argv:
+      - tailscale
+      - up
+      - "--advertise-tags={{ tailscale_tag }}"
+      - "--advertise-routes={{ tailscale_routes | join(',') }}"
+      - --snat-subnet-routes=true
+      - --accept-dns=false
+      - --netfilter-mode=on
+      - "--accept-routes={{ (router_prefs.stdout | from_json).RouteAll | ternary('true', 'false') }}"
+      - "--ssh={{ (router_prefs.stdout | from_json).RunSSH | ternary('true', 'false') }}"
+      - "--hostname={{ (router_prefs.stdout | from_json).Hostname }}"
+      - "--operator={{ (router_prefs.stdout | from_json).OperatorUser | default('') }}"
+      - "--shields-up={{ (router_prefs.stdout | from_json).ShieldsUp | ternary('true', 'false') }}"
+  when: ((router_prefs.stdout | from_json).AdvertiseTags | default([], true)) != [tailscale_tag]
+  changed_when: true
 - name: Persist desired subnet routing preferences with Tailscale netfilter
   ansible.builtin.command:
     argv:
       - tailscale
       - set
       - "--advertise-routes={{ tailscale_routes | join(',') }}"
-      - "--advertise-tags={{ tailscale_tag }}"
       - --snat-subnet-routes=true
       - --accept-dns=false
       - --netfilter-mode=on
@@ -92,6 +110,5 @@
     ((router_prefs.stdout | from_json).AdvertiseRoutes | default([], true) | sort) != (tailscale_routes | sort)
     or (router_prefs.stdout | from_json).NoSNAT
     or (router_prefs.stdout | from_json).CorpDNS
-    or ((router_prefs.stdout | from_json).AdvertiseTags | default([], true)) != [tailscale_tag]
     or (router_prefs.stdout | from_json).NetfilterMode != 2
   changed_when: true
