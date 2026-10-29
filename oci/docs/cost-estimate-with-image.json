@@ -83,5 +83,6 @@
     "Egress and other tenancy spend unknown; supply measured extras",
     "Runtime model does not enforce promotional expiry; current verified balance/expiry are in billing-evidence.json",
     "Taxes and account contract discounts not established"
-  ]
+  ],
+  "billing_period_hours": 730
 }
