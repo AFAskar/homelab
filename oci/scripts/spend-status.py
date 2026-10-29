@@ -21,11 +21,16 @@ while True:
  if not page:
   break
 totals={}
+incomplete=set()
 for row in rows:
- if row.computed_amount is not None:
-  key=(row.currency,row.service)
-  totals[key]=totals.get(key,0)+row.computed_amount
-result={'period_start':start.isoformat(),'period_end':end.isoformat(),'reported_costs':[{'service':service,'currency':currency,'amount':amount} for (currency,service),amount in sorted(totals.items())],'notice':'Usage and credit ledgers can lag. Promotion expiry can precede arithmetic credit exhaustion; budgets do not stop charges.'}
+ key=(row.currency,row.service)
+ if row.computed_amount is None:
+  totals.setdefault(key,None)
+  incomplete.add(key)
+ else:
+  totals[key]=(totals.get(key) or 0)+row.computed_amount
+reported=[{'service':service,'currency':currency,'amount':amount,'complete':(currency,service) not in incomplete} for (currency,service),amount in sorted(totals.items(),key=lambda item:tuple(v or '' for v in item[0]))]
+result={'period_start':start.isoformat(),'period_end':end.isoformat(),'reported_costs':reported,'costs_complete':not incomplete,'notice':'Usage and credit ledgers can lag. An incomplete total contains only known amounts, or null if all amounts are unknown. Promotion expiry can precede arithmetic credit exhaustion; budgets do not stop charges.'}
 if a.subscription_id:
  subscriptions=oci.onesubscription.SubscriptionClient(c).list_subscriptions(c['tenancy'],subscription_id=a.subscription_id,is_commit_info_required=True).data
  result['promotions']=[{'currency':sub.currency.iso_code,'status':service.status,'used':service.used_amount,'available':service.available_amount,'expires_utc':service.time_end.isoformat() if service.time_end else None} for sub in subscriptions for service in sub.subscribed_services if service.product.part_number=='B88385']
