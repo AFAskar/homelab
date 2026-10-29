@@ -1,0 +1,310 @@
+{
+  "recorded_utc": "2026-10-29T14:35:17.324832+00:00",
+  "scope": "Targeted non-Windows staging preview from the real backend; not a complete environment plan or approval to apply",
+  "plan_sha256": "30f6765c1ded0b9ff4b33f41f97cd8d150dbef5379ea6a40193ca0a5fbd6e7a8",
+  "planning_only_discovery_override": true,
+  "windows_compatibility_gate": false,
+  "summary": {
+    "import": 13,
+    "create": 28,
+    "update": 1,
+    "delete": 0
+  },
+  "resources": [
+    {
+      "address": "oci_budget_alert_rule.credits[\"200\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_budget_alert_rule.credits[\"225\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_budget_alert_rule.credits[\"240\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_budget_budget.credits",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_boot_volume.wings_04",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_instance.wings[\"wings-01\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_instance.wings[\"wings-02\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_instance.wings[\"wings-03\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_instance.wings_04",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_internet_gateway.retained_internet_gateway_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_nat_gateway.retained_nat_gateway_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_network_security_group.router",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group.windows",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group.wings",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.egress[\"windows\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.egress[\"wings\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.games[\"minecraft\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.panel_callback[\"10.10.50.0/24\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.rdp[\"10.10.50.10/32\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.wings_private[\"10.10.50.10/32:2022\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.wings_private[\"10.10.50.10/32:22\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.wings_private[\"10.10.50.10/32:8080\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_network_security_group_security_rule.wings_private[\"10.10.50.10/32:9100\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_route_table.retained_route_table_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_route_table.retained_route_table_1",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_security_list.retained_security_list_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_security_list.retained_security_list_1",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_service_gateway.retained_service_gateway_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_subnet.retained_subnet_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_subnet.retained_subnet_1",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_vcn.retained_vcn_0",
+      "actions": [
+        "no-op"
+      ],
+      "import": true
+    },
+    {
+      "address": "oci_core_volume.wings[\"wings-01\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_volume.wings[\"wings-02\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_volume.wings[\"wings-03\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_volume_attachment.wings[\"wings-01\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_volume_attachment.wings[\"wings-02\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_core_volume_attachment.wings[\"wings-03\"]",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "oci_objectstorage_bucket.backups",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "tailscale_acl.tailnet",
+      "actions": [
+        "update"
+      ],
+      "import": true
+    },
+    {
+      "address": "terraform_data.network_gate",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    },
+    {
+      "address": "terraform_data.review_gate",
+      "actions": [
+        "create"
+      ],
+      "import": false
+    }
+  ],
+  "not_included": [
+    "Windows instance launch",
+    "private-access lockdown before verification",
+    "guest provisioning",
+    "Kubernetes deployment",
+    "resource cleanup",
+    "merge"
+  ]
+}
