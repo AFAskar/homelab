@@ -49,7 +49,7 @@ Oracle's [regular Compute image-capability reference](https://docs.oracle.com/en
 
 Keep the exact requested shape, 2 OCPUs/16 GB, 100 GB boot and Secure Boot/TPM settings. Before opening `windows_compatibility_verified`, obtain current Oracle documentation or technical support confirmation covering that regular Compute configuration. Otherwise present a supported service/image alternative for separate user approval. Do not silently switch service/OS, disable security checks or resize storage. The 80 GiB image fits within the planned capacity by size; a real launch has not verified the boot-volume minimum.
 
-A concrete technical support question is ready for the user to submit or explicitly authorize sending:
+The user authorized sending the technical question to Oracle Support. Technical and account support API validation both return `403 AUTHZ_FAILED`, including with the discovered Default domain explicitly supplied. No support request has been submitted and no support purchase was made. The OCI Console is at the existing account’s sign-in page; user sign-in is needed to inspect support linking/registration or use its available support channel. The exact question is:
 
 > In me-riyadh-1, can regular Compute VM.Standard.E4.Flex launch an imported Windows11 custom image with UEFI, Secure Boot, measured boot and TPM? Our 80 GiB image is AVAILABLE; Windows/Windows11 metadata, Compute.SecureBoot=true and E4 compatibility are API-accepted. Regular Compute documentation excludes custom-image Secure Boot, while the Secure Desktops guide enables it. Please confirm the supported regular Compute path and required settings, including a 100 GB boot volume, or identify the smallest supported service change. No security bypass is acceptable.
 
