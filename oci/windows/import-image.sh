@@ -11,6 +11,12 @@ digest=$(sha256sum "$1" | cut -d' ' -f1)
 [[ $OCI_APPROVED_IMAGE_SHA256 =~ ^[0-9a-f]{64}$ && $digest == "$OCI_APPROVED_IMAGE_SHA256" ]] || { echo 'Image differs from the approved SHA256; stop and review it again.' >&2; exit 2; }
 object="win11-$digest.qcow2"
 image_name="win11-lab-$digest"
+# OCI accepts Windows11 metadata through UpdateImage after import, not through
+# CreateImage's source operatingSystemVersion. Follow Oracle's Windows guide.
+set_windows_metadata() {
+  oci compute image update --image-id "$1" --operating-system Windows \
+    --operating-system-version Windows11 --force --query data.id --raw-output
+}
 # A failed/timed-out import must resume the same image, never create a duplicate.
 images=$(oci compute image list --compartment-id "$OCI_COMPARTMENT_OCID" --display-name "$image_name" --all)
 # OCI CLI emits no JSON when a list is empty.
@@ -27,7 +33,7 @@ if [[ -n $image_id ]]; then
   while (( SECONDS < deadline )); do
     state=$(oci compute image get --image-id "$image_id" --query 'data."lifecycle-state"' --raw-output)
     case "$state" in
-      AVAILABLE) printf '%s\n' "$image_id"; exit 0 ;;
+      AVAILABLE) set_windows_metadata "$image_id"; exit 0 ;;
       IMPORTING) sleep 30 ;;
       *) echo "Existing image entered state $state; inspect before retrying." >&2; exit 2 ;;
     esac
@@ -46,10 +52,11 @@ else
 fi
 source_details=$(python3 - "$OCI_IMAGE_NAMESPACE" "$OCI_IMAGE_BUCKET" "$object" <<'ENDPY'
 import json,sys
-print(json.dumps(dict(sourceType='objectStorageTuple',namespaceName=sys.argv[1],bucketName=sys.argv[2],objectName=sys.argv[3],sourceImageType='QCOW2',operatingSystem='Windows',operatingSystemVersion='Windows11')))
+print(json.dumps(dict(sourceType='objectStorageTuple',namespaceName=sys.argv[1],bucketName=sys.argv[2],objectName=sys.argv[3],sourceImageType='QCOW2')))
 ENDPY
 )
-oci compute image create --compartment-id "$OCI_COMPARTMENT_OCID" --display-name "$image_name" \
-  --launch-mode PARAVIRTUALIZED --image-source-details "$source_details" --wait-for-state AVAILABLE --max-wait-seconds 7200 --query data.id --raw-output
+image_id=$(oci compute image create --compartment-id "$OCI_COMPARTMENT_OCID" --display-name "$image_name" \
+  --launch-mode PARAVIRTUALIZED --image-source-details "$source_details" --wait-for-state AVAILABLE --max-wait-seconds 7200 --query data.id --raw-output)
+set_windows_metadata "$image_id"
 # Do not delete source images automatically. Import does not prove guest compatibility.
 # Serialize runs for the same source disk; this is retry-safe, not a distributed lock.
