@@ -1,154 +1,64 @@
 # Validation and acceptance — 2026-10-29
 
-## Implemented
+## Current status
 
-One OCI Terraform root, provider 9.11.0 with lockfile, exact requested paid matrix, protected/imported Thor and shared-network definitions, UUID data-volume provisioning, private NSGs, security-list hardening switch, EUR budget alerts, cloud-init and Ansible Wings/Tailscale/firewall roles, private callback proxy, pod-route configuration, Panel GitOps manifests, SOPS APP_KEY, private monitoring, inventory/cost/backup/health/spend/Windows scripts and preservation/deletion/recovery documentation.
+Infrastructure/provisioning/GitOps code is implemented. Local Windows acquisition, sanitization, generalization and isolated first-boot/NLA tests are complete. The user approved **only state/image preparation up to €5**. That stage created private state/image storage, imported the approved Windows disk and configured/read back its image capabilities. **No OCI VM was created or booted.**
 
-“Imported definitions” means import blocks are present, not that authoritative state has been changed. Preservation freezes intentionally defer complete drift reconciliation. Local Windows acquisition, sanitization and generalization are complete; OCI upload/import and live guest acceptance remain pending.
+- Private Standard `homelab-tfstate`: versioning Enabled; the real OCI Terraform backend initializes successfully.
+- Private Standard `homelab-win11-images`: versioning Disabled, Terraform-managed with prevent_destroy. Its authoritative bootstrap apply added exactly one bucket, changed/deleted nothing and imported no retained resource.
+- Uploaded source: **17,315,330,048 bytes**, SHA256 metadata matches the approved `c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881`.
+- OCI image: **AVAILABLE**, OS **Windows / Windows11**, **81,920 MB**, PARAVIRTUALIZED. E4 compatibility entry and image UEFI/Secure Boot capability configuration were accepted and read back. [Actual API evidence](windows-oci-import.json).
+- The first CreateImage call rejected Windows11 source-version metadata. The corrected importer reused the completed upload, imported without OS metadata, then successfully updated Windows/Windows11 after availability, following Oracle's documented sequence. No second upload or duplicate image was created.
+- `windows_compatibility_verified`, `discovery_reviewed` and `private_access_verified` remain false. No retained-resource authoritative import, compute deployment, live tailnet-policy change, OCI guest provisioning, Argo sync, cleanup or merge occurred.
+
+Image metadata acceptance does **not** establish a supported regular Compute Secure Boot launch or successful Windows boot/RDP. The regular Compute restriction below remains unresolved.
 
 ## Checks executed
 
 | Check | Result and limit |
 |---|---|
-| `terraform fmt -check` | Pass on actual `oci/terraform/` root |
-| `terraform init -backend=false -input=false` | Pass; official provider downloaded, lockfile committed. Initially backend-disabled; approved bootstrap now created private versioned state and real backend init passes |
-| `terraform validate` | Pass on actual root |
-| Preservation plan against live OCI | Pass in private temporary diagnostic copy using local backend and **exceptional retained-resource targets**: **12 imports, 0 additions, 0 changes, 0 deletions**. All 12 resource actions are `no-op`. [Sanitized summary](import-plan-summary.json). No apply/import executed |
-| Plan destruction guard | Pass on preservation plan JSON |
-| Full un-targeted diagnostic plan | Expected blocked result, exit 1: `discovery_reviewed=false`. Not an executable approved deployment plan |
-| Windows gate diagnostic | With only discovery gate overridden in a temporary read-only plan, expected exit 1 at `windows_compatibility_verified=false`. No gate override is saved in deployment inputs |
-| Live image/shape compatibility | OCI `GetImageShapeCompatibilityEntry` confirmed the selected Ubuntu 26.04 image and E6.Flex; E6/E4 limits have headroom. This is not a capacity reservation or guest boot test |
-| Docker package availability | Official Resolute signed-package index contains pinned Docker CE/containerd versions for amd64 and arm64 |
-| Argo app root build | `kubectl kustomize kubernetes` passes |
-| Panel Kustomize/KSOPS | Pass using existing authorized Argo SOPS key without printing decrypted secrets; 12 resources rendered |
-| Kubeconform strict validation | 9 valid, 0 invalid/errors, 3 CRDs skipped due missing downloaded schemas |
-| Kubernetes server dry-run | Pass for all 11 namespaced rendered objects, including cert-manager and Prometheus CRDs, using **existing default namespace in a temporary validation copy**. Namespace object dry-run passes separately. Actual pelican namespace is absent; no live resource created. This validates API admission, not scheduling, storage, container startup or functionality |
-| Ansible syntax checks | Pass for Wings/router, bootstrap-router, homelab routes and callback proxy playbooks, with pinned collections |
-| Ansible lint | Pass at production profile; dependency deprecation messages only. In-guest idempotence is not yet tested |
-| ShellCheck | Pass for all delivered shell scripts, including sourced Windows helper |
-| Windows PowerShell syntax | Both inspect-source.ps1 and first-boot.ps1 parsed successfully using the source guest PowerShell parser, without executing first-boot changes |
-| Python compilation | Pass for delivered Python scripts |
-| Windows source follow-up | Read-only inspection and checkpoint hash passed. Independent 80 GiB clone boots Windows 11 with TPM/Secure Boot and updated VirtIO disk/NIC; guest SSH succeeds over an isolated host port. Sysprep/generalization and local NLA authentication pass; no OCI import or boot |
-| Windows lifecycle safety regression | Six offline tests pass: approval required for start, correct managed identity/profile/region, already-running/stopped idempotence, graceful SOFTSTOP, read-only status. **Not live OCI or RDP tests** |
-| Secret scan | Gitleaks redacted scan of new delivery passed; large ignored provider binary excluded. Plaintext credentials, age key and raw billing/inventory are not committed |
-| Public ingress review | New public NSG game rule is TCP/25565 only. No new public SSH/RDP/API ingress. Existing public SSH remains until a verified route/recovery path; final lockdown is NOT claimed |
-| Spending read | Usage API currently reports zero EUR computed cost for Compute, Block Storage, VCN. OneSubscription separately confirms €250 available, €0 used and expiry November 21 at 23:59:59 UTC; usage/balance may lag |
+| Terraform fmt/init/validate | Pass on the actual `oci/terraform/` root, pinned OCI 9.11.0 and Tailscale 0.29.3 providers. Remote OCI backend initialization also passes after approved bootstrap |
+| Preservation diagnostic plan | **12 imports, 0 additions/changes/deletions**; every retained-resource action is no-op. Private diagnostic copy used because state bootstrap had not happened then. [Summary](import-plan-summary.json). No retained-resource import applied |
+| Image bucket | Diagnostic and real-backend plans verified exactly one private bucket addition; approved apply succeeded. [Diagnostic summary](image-bucket-plan-summary.json). A subsequent real-backend targeted bucket reconciliation returns exit 0/no changes. This is not a full environment plan |
+| Full deployment gates | Un-targeted diagnostic plans deliberately fail while discovery/Windows gates are false. No approved executable full compute plan exists |
+| Tailnet policy | Real API validation passes **13** embedded tests; isolated targeted plan proposes one policy import/update, zero adds/destroys. A deliberately forbidden `pos:2375` acceptance test was rejected. [Summary](tailscale-plan-summary.json). Live allow-all policy unchanged |
+| OCI preflight | Selected Ubuntu 26.04 x86-64 image is E6-compatible; E6/E4 quota headroom checked. Capacity is not reserved |
+| Docker packages | Official signed Ubuntu Resolute repositories contain the pinned Docker CE/containerd versions for amd64 and arm64 |
+| Kustomize/KSOPS | Argo root and Panel builds pass with the existing authorized SOPS identity; generated public CA matches the sole PKI source |
+| Kubernetes validation | Kubeconform: 9 valid, 0 invalid/errors, 3 CRD schemas skipped. Server dry-run admits all 11 namespaced objects in an existing default namespace validation copy; namespace checked separately. No live Panel deployment or runtime test |
+| Ansible | Playbook syntax and production-profile lint pass. Homelab read-only hostname checks pass using retained SSH aliases. Live provisioning/idempotence remains untested |
+| Shell/Python/PowerShell | ShellCheck and Python compilation pass. All four delivered PowerShell scripts parse using Windows PowerShell without running preparation on the original VM |
+| Local Windows capture | Final standalone compressed 80 GiB QCOW2 passes qemu-img check/hash. A separate copy completes fresh Secure Boot/TPM2 first boot with signed VirtIO disk/NIC; winlab NLA correct password exits 0, wrong password 134. TLS fingerprint pinned. [Evidence](windows-image-validation.json). This is not OCI/Tailscale RDP |
+| Windows import/configuration | Live import, post-import Windows11 metadata update, candidate schema and E4 entry succeed. Offline cases cover source/object/image reuse, empty list output, checksum rejection, clean OCID stdout, missing global schema, existing-schema preservation and oversized-image rejection |
+| Windows lifecycle | Six offline safety checks pass, including start approval, exact managed identity, idempotence and graceful SOFTSTOP. No live OCI start/stop/RDP test |
+| Spending | DAILY month-to-date query and subscription lookup succeed. Pagination, separate currencies and null/incomplete totals tested with synthetic rows. Credit projections record their starting balance and an independent 730-hour billing period; zero Wings runtime still includes storage/Windows costs |
+| Secrets | Redacted Gitleaks scan of tracked OCI/Panel/AGENTS delivery passes. Credentials, raw inventory, state/plans, age identity and disk images remain ignored |
+| Public ingress | New public game rule is TCP/25565 only; no new public SSH/RDP/API rule. Existing public SSH remains until verified private/recovery access; final lockdown is not claimed |
 
-Provider/backend diagnostics and raw plans contain infrastructure details and remain outside Git. The real root keeps the secure OCI backend; the temporary diagnostic copy is neither a second maintained environment nor an approved deployment path. Only a sanitized import summary is committed. The approved private versioned state bucket is now initialized in the real root. Regenerate safe plans against that backend as the remaining prerequisites are resolved.
+## Preservation and recovery evidence
 
-## Deployment and unresolved prerequisites
+Thor's actual ARM64 A1 4 OCPU/24 GB/100 GB configuration and working Bitwarden-backed SSH were discovered. Its Docker/Tailscale versions, root filesystem, available capacity and absence of game containers/data were checked. It still listens for SSH on its tailnet address; no guest configuration has been changed.
 
-The user-approved €5 state/image stage has created the private versioned state bucket and applied exactly one Terraform image-bucket addition against that remote backend. The approved Windows source upload completed with 17,315,330,048 bytes and matching SHA256 metadata. The first CreateImage call rejected Windows11 source-version metadata (HTTP 400); the corrected script follows Oracle's import-first/UpdateImage-after sequence and reuses the same source object. OCI accepted image `ocid1.image.oc1.me-riyadh-1.aaaaaaaa2ua6zisc4bwmbhfnsv4hl55rsnkgflvoz53uib7wpofqejodaneq`, currently IMPORTING. Its temporary API classification is Custom/Custom until the post-import Windows11 update is accepted. Capability checks and VM boot remain unverified. No compute apply, retained-resource import, live ACL change, resource cleanup, OCI guest provisioning, Argo sync or merge was performed. Authorized destructive Windows preparation was limited to disposable local clones; the original MPMB VM was resumed from managed-save. Kubernetes checks were dry-runs.
+An age-encrypted configuration/access archive was captured outside Git to the existing recovery recipient. A streamed decryption/tar integrity test passed without writing a plaintext archive or age identity. It contains SSH/netplan/Docker/systemd/authorized_keys and Tailscale state; it is a configuration backup, not a full disk snapshot.
 
-1. **Thor access migration/recovery**: the Bitwarden agent identity was recovered and read-only guest/data inventory succeeded with sudo. Docker/containerd/Tailscale versions, root UUID, ample resources and absence of game containers/data were checked. SSH currently listens only on its tailnet IP; private listener, router advertisement/grants, persistent firewall and OCI console recovery remain pending. An age-encrypted configuration/access backup was captured outside Git before migration. `bootstrap-router.yaml` preserves the tailnet listener while preparing private SSH. No live host change was made.
-2. **Windows 11 OCI image/security/boot-volume path**: local MPMB Windows 11 Pro source was inspected and a hash-verified 80 GiB offline-checkpoint clone passed `qemu-img check`. Current source guest reports TPM2 and Secure Boot enabled; installer bypass flags are also present. Old staged storage drivers produced Code 52 and failed boot on the clone. Updated signed VirtIO 0.1.302 drivers now boot with Secure Boot and TPM enabled. The Windows 11-specific Oracle guide documents UEFI/Secure Boot custom-image preparation, conflicting with generic shielded restrictions; actual image/E4 compatibility still needs approved testing. Its import guide says 256 GB but its linked boot-volume guide says the image default or 50 GB for current images, so the earlier hard 256 GB claim is withdrawn. Keep 100 GB and verify the actual imported-image minimum. Source acquisition, clone sanitization and generalization are complete. Image upload/import and capability checks are approved within €5 and underway; VM launch and live private RDP still require a separate approved compute plan. No source VM mutation, security bypass or allocation substitution was made.
-3. **State bootstrap completed; backup/deployment pending**: private Standard `homelab-tfstate` has versioning Enabled; the real OCI backend initialized successfully. Terraform applied exactly one private `homelab-win11-images` bucket and tracks it in that remote state. The user approved this state/image stage up to €5; no further state-bootstrap approval or credential is requested. Default-domain Administrators membership and root policy were verified; bucket-scoped operator examples are documented. Backup bucket/storage and broader deployment remain outside this stage. Run Command is unavailable, but native SSH already works.
-4. **Billing resolved for current term:** authenticated subscription discovery confirms €250 available, €0 used, promotion expiry November 21 at 23:59:59 UTC / November 22 at 02:59:59 Riyadh, and account-specific A1 3000 OCPU-hour / 18000 GB-hour free tiers. Native EUR paid rates are corroborated by the account rate card. Recalculate actual start/image/traffic costs before approval and recheck rates at term rollover. No further billing information is currently requested from the user.
-5. **Tailnet policy, routes, DNS and certificates**: the user confirms the current policy is allow-all. A concrete restrictive IPv4 policy with observed identities/subnets and embedded accept/deny tests is now prepared at `ansible/tailscale/policy.hujson`. Control-plane validation passes all 13 tests through Terraform; applying the policy still needs approval. Neither homelab host currently accepts routes. Private DNS, TLS renewal, callback proxy, pod route tests and VNIC additive NSGs remain to be deployed/verified.
-6. **Panel and backup/monitoring acceptance**: installer/admin setup, node enrollment, game eggs/images, scheduled quiesced backups, restore test, all exporter endpoints, external game probes and daily credit/lifecycle monitoring still need live configuration. Public CA data and private SOPS key trust were checked locally; application behavior was not.
+Original MPMB disk/NVRAM/TPM were preserved. With explicit permission it was temporarily managed-saved while disposable clones were tested, then resumed from saved RAM with its Acrobat desktop retained. It is running again. Clone sanitization removed its copied source profile/fixtures and SSH keys, cleared free clusters and offline NTFS metadata, and Sysprep generalized/shut down before capture. No security bypass was introduced.
 
-## Live acceptance checklist — all pending
+## Remaining support constraint and prerequisites
 
-- [ ] Thor guest/data/recovery inventory complete, preserved ARM64 4/24/100 GB configuration and safe authoritative import verified.
-- [ ] Full approved plan applied through protected state; clean subsequent un-targeted plan or reviewed differences.
-- [ ] All four Wings nodes online in Panel, correct disks/data paths, Docker/Wings survive reboot.
-- [ ] ARM64-compatible game tested on Thor, AMD games tested, public allocation reached from outside tailnet.
-- [ ] Approved subnet routes/grants work; administrators privately SSH to each Linux private IP.
-- [ ] Both Kubernetes nodes' pods can reach Wings TLS/API; browser websockets/uploads and reverse Panel callbacks succeed.
-- [ ] Public SSH/RDP rules removed only after private/recovery verification; host and OCI ingress checked externally.
-- [ ] Supported Windows 11 image prepared/imported; guest boots with TPM2/UEFI; private RDP login succeeds.
-- [ ] Live Windows start/stop/status test passes, state plan unchanged, VM left stopped.
-- [ ] Consistent selected backups uploaded, staged restore and checksums verified, bounded retention reviewed.
-- [ ] Service/CPU/RAM/disk/game/route/Windows/credit monitoring and alert delivery verified.
-- [ ] Any later exact legacy cleanup approved and executed only after dependency checks; currently deletion set is empty.
+Oracle's [regular Compute image-capability reference](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm) excludes Secure Boot for custom images. The [Secure Desktops Windows guide](https://docs.oracle.com/en-us/iaas/secure-desktops/windows-image.htm) configures shielded **desktop-pool** instances; its manual Compute smoke-test recommendation does not establish a supported regular E4 Secure Boot launch. API acceptance of the image schema/shape entry alone cannot open the Windows gate.
 
-## Required approvals
+Keep the exact requested shape, 2 OCPUs/16 GB, 100 GB boot and Secure Boot/TPM settings. Before opening `windows_compatibility_verified`, obtain current Oracle documentation or technical support confirmation covering that regular Compute configuration. Otherwise present a supported service/image alternative for separate user approval. Do not silently switch service/OS, disable security checks or resize storage. The 80 GiB image fits within the planned capacity by size; a real launch has not verified the boot-volume minimum.
 
-Image upload/import is a separate billable approval stage that precedes the complete launch plan. Review the finalized image digest, bounded storage estimate and state-bucket bootstrap first; after API compatibility acceptance, regenerate and review the full compute plan. Obtain separate explicit approval for access-cutting/destructive cleanup and any requirements change. Do not merge this draft PR without the user's explicit instruction.
+A concrete technical support question is ready for the user to submit or explicitly authorize sending:
 
-## CodeRabbit review follow-up
+> In me-riyadh-1, can regular Compute VM.Standard.E4.Flex launch an imported Windows11 custom image with UEFI, Secure Boot, measured boot and TPM? Our 80 GiB image is AVAILABLE; Windows/Windows11 metadata, Compute.SecureBoot=true and E4 compatibility are API-accepted. Regular Compute documentation excludes custom-image Secure Boot, while the Secure Desktops guide enables it. Please confirm the supported regular Compute path and required settings, including a 100 GB boot volume, or identify the smallest supported service change. No security bypass is acceptable.
 
-Accepted the functional findings with focused commits: application readiness, SSH validation before restart, callback tailnet grant, refreshable exporter inventory, clear locked-agent errors, retry-safe Windows import, JSON tfvars exclusion, Caddy 2.6.2 trust syntax, CA/DNS before any Wings start, bootstrap/Panel/certificate prerequisites, private-port range exclusions, EndpointSlice discovery and partition-signature guards. Also accepted the small `nofail` recovery and IMDSv2-only improvements. `AGENTS.md` now requires atomic commits and validation.
+Other pending work: reviewed Thor private-listener/router migration and console recovery, route approval, homelab pod routing/TLS/callback deployment, safe retained imports, full launch plan, Panel setup/enrollment, public game tests, backups/restores and monitoring/alert delivery. Existing credentials work; no new private key or Windows source material is requested.
 
-The Panel CA copy was byte-identical to `pki/homelab-root-ca.crt`. It has been removed: a shared `pki/kustomization.yaml` generates the ConfigMap from that sole existing public certificate, respecting Kustomize loading restrictions without maintaining a duplicate CA file.
+## Costs, approvals and review
 
-Validation of the review fixes:
+Verified subscription evidence records €250 initially unused, expiry **November 21 at 23:59:59 UTC / November 22 at 02:59:59 Riyadh**, and current A1 free tiers covering Thor. Native EUR baseline is €230.42 per 730-hour month with 120 Windows hours and 50 GB backups; conservative image/source storage gives €232.88 before unmeasured state/API/egress/taxes. Billing can lag. Refresh costs/balance at launch approval and recheck rates at term rollover; continuing beyond expiry needs a funding/duration decision. Alerts do not cap spending.
 
-- Panel/Kustomize/KSOPS build succeeds; the generated CA data exactly matches the PKI source. Kubeconform reports 9 valid objects, 3 CRDs skipped, no invalid objects; live Kubernetes API dry-run validates those CRDs as well in the existing default namespace. Nothing is persisted.
-- Ansible syntax/lint passes. The callback Caddyfile validates with the exact Caddy 2.6.2 upstream binary (publisher SHA512 verified), using disposable local test certificates; Thor's archive candidate is 2.6.2-14. No Caddy package was installed on Thor.
-- Non-modifying signature probes distinguish blank, GPT and ext4 disposable files and preserve their SHA256 values. Formatting remains gated; no live disk was formatted. `nofail` keeps the host bootable, while Wings still requires the data mount.
-- Terraform formatting/validation passes. Diagnostic console checks accept TCP/25565 and reject individual private ports 2022/3389/8080/9100 and ranges 2000–3000 / 9000–10000; no API write or apply occurs.
-- Offline tests preserve an existing private inventory while refreshing all four synthetic exporter/DNS targets. Empty/malformed agents produce clear failures without a traceback or output key.
-- Offline Windows import tests cover a fresh upload, empty CLI list output, existing import reuse, existing upload reuse and checksum-mismatch rejection. Those offline tests performed no upload/import; the subsequently approved live upload is complete and Compute image import is in progress as described above. Existing-import polling uses supported CLI commands; concurrent imports of the same source must still be serialized by the operator.
-- ShellCheck, Python compilation, six lifecycle regression tests and redacted secret scanning pass.
+State/image operations only are approved up to €5. Compute launches, live ACL/access changes, retained-resource imports, backup storage, cleanup and merge require their applicable further approvals. No deletion is currently proposed. Full acceptance remains pending: all four Wings online, architecture-compatible games publicly reachable, reboot-persistent services/data, private SSH/RDP through approved subnet routing, public admin ingress removed after recovery checks, live Windows lifecycle tests ending STOPPED, clean full state plan, restore tests and monitoring.
 
-Findings intentionally not applied:
-
-- Redacting every live address/OCID from the discovery record would remove the exact inventory requested by the user, while those identifiers remain required in the import definitions. Public certificates, addresses and resource OCIDs are not authentication credentials. Raw inventories, private keys, credentials, billing personal data, state and plans remain excluded from Git.
-- The three new exporter IPs cannot be added before those instances exist. The renderer already derives all four targets from actual Terraform outputs and can now refresh them without discarding operator inventory. No fictional addresses are added.
-- A read-only root filesystem is not applied blindly to the official Panel image, which writes runtime application/plugin/cache files. Its UID/capability restrictions remain; changing its filesystem layout warrants application testing beyond this focused fix.
-
-## What the user needs to decide or provide
-
-1. **Windows image/deployment approval:** no source media or hosting decision is currently needed. Oracle’s Windows 11-specific guide supplies a candidate UEFI/Secure Boot custom-image workflow; generic documentation conflicts, so actual image capability acceptance and E4 boot still need testing after an approved import. Local clone sanitization/generalization are complete; approved image import records preparation evidence; a documented supported launch path is required before any separately approved first launch. No size increase or security bypass is requested.
-2. **Credits:** no additional information is needed now: account API discovery confirms the unused €250 promotion, actual expiry and A1 free tiers. The agent will include the expiry-limited cost forecast in the concrete deployment approval. Continuing PAYG operation after expiry needs an explicit funding/duration decision.
-3. **Tailnet administration:** the supplied OAuth credential now validates the reviewed policy through Terraform. Approve its reviewed replacement of the existing allow-all policy; route approval is a separate admin operation after the router advertises the two required subnets. Existing OCI and Bitwarden credentials work; no new private SSH key is needed.
-4. **Deployment approval:** after these decisions, state/image bootstrap is already approved up to €5 and remote state is working. Separately approve concrete saved plans for retained-resource imports/access migration and compute/backup deployment. The agent can prepare and execute the technical steps; the user need not manually create VMs, certificates or the Panel. Further billable applies outside the approved state/image stage, access-cutting changes, cleanup and merging remain withheld until their applicable explicit approvals.
-
-## Windows disk reduction — 2026-10-28
-
-User-authorized planned Windows boot capacity is now 100 GB instead of the original 200 GB. Wings data disks remain 200 GB each; Thor remains unchanged. Direct official USD/EUR tariffs give $4.25 / €3.95 monthly savings and a conditional baseline of $247.76 USD list / €230.42 EUR list; the earlier €222.55 spot-converted estimate is superseded, with 850 GB paid instance storage. Terraform formatting/validation and estimator consistency checks pass. This changes configuration only; no local disk resize, OCI apply or billable action occurred.
-
-## Concrete tailnet policy — user-requested hardening
-
-The example with placeholders has been replaced by `ansible/tailscale/policy.hujson`. Admin clients are the observed laptop and freyr; servers get only the required API/metrics/callback paths, and other members/owner devices receive no infrastructure grant. Router host-firewall admin sources match. Thirteen embedded Tailscale accept/deny tests cover admin access, service paths, denied lateral administration and non-admin devices. Local JSON/selector/port structure checks pass; official control-plane evaluation now passes; live routed connectivity remains pending. No live policy, route approval or host change was made.
-
-
-## Local Windows clone verification — 2026-10-29
-
-With explicit permission, MPMB was managed-saved, the isolated clone was tested, then MPMB resumed from saved RAM. Its original Acrobat desktop remained open and its guest agent responded after resume. Only clone disks/NVRAM/TPM and disposable test media were modified. No source shutdown, sysprep or storage resize was performed.
-
-The clone independently booted its sole 80 GiB system disk through VirtIO with a VirtIO NIC, TPM ready and Secure Boot enabled. SSH over isolated localhost port 2223 succeeded. Old driver Code 52 was fixed by installing catalog-verified VirtIO-Win 0.1.302 packages; no signature/Secure Boot bypass was used. `install-virtio.ps1` passed the Windows PowerShell parser; extraction and all Windows shell scripts passed ShellCheck. The clone was shut down afterward. The clone was subsequently sanitized and generalized; the finalized image has its own validation evidence.
-
-Offline image-import configuration checks pass for fresh schema creation, existing-schema reuse/preservation (including CLI response/input key conversion) and rejection of an oversized image before mutation. Installed OCI CLI help and provider/SDK schema were inspected. Those offline checks performed no metadata write, upload/import, OCI boot or private RDP test; current approved upload progress is recorded above.
-
-
-## Second CodeRabbit review
-
-Fixed all five new findings in separate commits: restart Wings after CA rotation only after its unit exists; reconcile generated routes in existing operator inventory; require the approved final image SHA256; handle the OCI CLI object-list `data` array and missing empty data; and put Windows OS metadata inside the supported image-source details. The exact import invocation passes the installed CLI parser using offline skeleton generation. Retry regression fixtures now match the actual CLI response shape, checked against its installed implementation. Inventory preservation/reconciliation and production Ansible lint pass. No OCI writes occurred during those review checks. The subsequently approved bucket bootstrap and active upload are described in the current status above.
-
-The native EUR tariff was independently retrieved and now drives credit-consumption estimates: €230.42 conditional baseline, €19.58 remaining from a full €250 after 730 hours, about 33.00 days. USD spot conversion remains a labelled comparison, not the EUR billing estimate. The smaller disputed A1 allowance raises the baseline to €255.51 before images/other costs; do not apply that over-budget scenario without an approved change.
-
-
-## Billing discovery resolved — 2026-10-29
-
-The classic numeric subscription ID works with OneSubscription list APIs. Direct response evidence confirms the separate B88385 promotional service has €250 available / €0 used and ends November 21 at 23:59:59 UTC. Account-specific A1 tiers are 3000 OCPU-hours / 18000 GB-hours at zero cost for the current term. The earlier unverified-credit and smaller-A1-allowance blockers are superseded by this evidence. Selected non-personal billing facts are in billing-evidence.json; raw responses remain private. `spend-status.py --subscription-id 100001000344740` successfully reproduces the available-credit/expiry check. No billing change or paid operation occurred.
-
-
-## Tailnet policy Terraform ownership — 2026-10-29
-
-Added the pinned official Tailscale provider 0.29.3 and `tailscale_acl.tailnet` in the existing OCI root, plus an official import block. The resource reads the existing policy before change, validates syntax/tests through the API during planning, prevents destruction and disables default-policy reset on destroy. Provider credentials are file-backed environment settings, not Terraform variables or outputs. No second root or CI writer was introduced. Provider installation, formatting and Terraform validation pass. The user supplied an owner-only OAuth credential with Policy File read/write scope. The isolated targeted plan passes API validation with 13 tests and proposes one import/one update/no adds or destroys. A deliberately forbidden acceptance test was rejected by the control plane, and the valid candidate was restored. The authenticated browser verified the current allow-all policy; its unsaved candidate preview was discarded and no live policy was saved. Native Tailscale SSH is disabled on pos, optiplex and Thor; optiplex was verified over its tailnet IP when LAN SSH was unavailable. The current split-DNS dependency is preserved with a DNS-only member grant.
-
-
-## Final Windows capture and third review fixes — 2026-10-29
-
-The independent clone was sanitized, Sysprep generalized and shut down. Its copied source profile/private fixtures, SSH keys and installer bypass flags were removed. Free clusters and offline NTFS MFT/directory/log/pagefile/tail data were cleared in disposable copies. The final standalone compressed 80 GiB QCOW2 passed `qemu-img check`. A separate copy booted with fresh Secure Boot firmware and TPM 2.0, VirtIO disk/NIC, completed unattended setup and authenticated the persistent `winlab` administrator over NLA. Correct-password authentication returned 0; a wrong password returned 134. TLS was pinned to the test server certificate. This tests the final sanitized capture locally, not OCI or Tailscale RDP. See [artifact and acceptance evidence](windows-image-validation.json). The original MPMB VM is resumed after testing; the unbooted upload capture remains private.
-
-The third review's functional findings are addressed: projection fields record their starting balance, image schema descriptors specify IMAGE source, schema creation discovers/passes the required global version, and a post-Sysprep `winlab` account is created and locally authenticated. The licensing request was declined under the user's explicit scope. At that review checkpoint no OCI upload, import or launch had occurred. The later approved upload is complete and image import is now in progress; VM launch remains pending.
-
-
-## State/image bootstrap review
-
-The image source bucket is defined in the same Terraform root, with NoPublicAccess, Standard storage, no redundant object versioning and prevent_destroy. Its isolated diagnostic target plan contains exactly one bucket creation and no imports/updates/deletions or compute/network changes. `image-bucket-plan-summary.json` records the result. The migration guide identifies the finalized image hash, private state/image bucket identities, separate approval stages and a proposed €5 storage/request ceiling before any compute launch; the user subsequently approved this stage up to €5; remote backend initialization and the one-bucket apply pass.
-
-Thor's age-encrypted configuration/access archive was captured outside Git using the existing repository recipient. Decryption and tar integrity were verified through a stream without writing a plaintext archive or age identity. SSH/netplan/Docker/systemd/authorized_keys and Tailscale state are included; this is a configuration recovery backup, not a full disk snapshot. The source was accessed in read-only mode.
-
-
-## Fourth CodeRabbit review
-
-All four findings were fixed in atomic commits and individually confirmed by CodeRabbit: targeted ACL bootstrap planning, a separate 730-hour billing period for credit duration, DAILY month-to-date usage aggregation, and the documented single-writer/recovery saved-plan invalidation procedure for provider updates without ETag protection. A zero-Wings-runtime estimate still has positive storage/Windows cost and credit duration. The live daily query succeeds; synthetic repeated rows sum by service while currencies remain separate and unknown costs are excluded. The requested additional full review is rate-limited; current head is not yet claimed fully reviewed.
-
-
-## Regular Compute Windows launch gate
-
-The Secure Desktops guide's shielded desktop-pool workflow does not by itself establish support for this regular Compute E4 custom image with Secure Boot/TPM. The regular Compute image-capability reference explicitly excludes Secure Boot for custom images. The compatibility gate remains false; image metadata API acceptance alone cannot open it. Require current Oracle documentation or technical support confirmation covering the exact regular Compute configuration, or present a separately approved supported service/image alternative. No security setting, shape, storage allocation or service is silently changed. The current approval still covers image preparation/import only.
+CodeRabbit findings are evaluated individually and fixed in atomic commits where useful. The latest OCID-output/approval-scope finding is fixed with passing fresh/reuse/checksum regressions. This status document now records current import completion rather than mixing historical checkpoints with current prerequisites. A fresh review of the final changes remains pending; resolved threads alone do not mean the current head is fully reviewed.
