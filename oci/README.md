@@ -1,6 +1,6 @@
 # OCI Pelican infrastructure
 
-**Review branch, not a deployed environment.** Start with [discovery](docs/existing-infrastructure.md), [migration](docs/migration.md), [costs](docs/costs.md), and [validation](docs/validation.md). Windows 11 has a locally verified VirtIO/Secure Boot/TPM build path; actual OCI image/shape compatibility and RDP remain unverified. No billable apply, authoritative import, OCI guest provisioning, cleanup, or merge has been performed.
+**Review branch, not a deployed environment.** Start with [discovery](docs/existing-infrastructure.md), [migration](docs/migration.md), [costs](docs/costs.md), and [validation](docs/validation.md). Windows 11 has a locally verified VirtIO/Secure Boot/TPM build path; actual OCI image/shape compatibility and RDP remain unverified. The user-approved €5 state/image stage has created private state and image buckets; Windows upload/import is in progress. No compute, live ACL change, retained-resource import, OCI guest provisioning, cleanup or merge has been performed.
 
 One Terraform root lives in `oci/terraform/`. It preserves Thor as logical `wings-04`, its 100 GB boot disk, and the existing Jotunheim network. Three paid E6 nodes have exactly 2 OCPUs, 16 GB RAM, 50 GB boot and 200 GB data each. Windows is a required E4 instance (2 OCPUs, 16 GB RAM, 100 GB boot), guarded against deployment without verified Windows 11 compatibility. No other paid router or new network is introduced.
 
@@ -20,7 +20,7 @@ terraform -chdir=oci/terraform plan -out=review.tfplan
 terraform -chdir=oci/terraform show -json review.tfplan | python3 oci/scripts/check-plan.py
 ```
 
-Supply a private **existing, versioned** state bucket first; none was discovered. Creating it and any storage charge needs approval. State is encrypted at rest by OCI. Use a dedicated bucket with bucket-scoped IAM, no public/PAR access, versioning, audit logging, and backend locks. Never share plan/state artifacts publicly. Bucket policy needs `OBJECT_INSPECT`, `OBJECT_READ`, `OBJECT_CREATE`, `OBJECT_DELETE` for the state and lock objects; separate administrators manage the bucket. Do not disable locking or force-unlock another writer. No credentials belong in `backend.hcl`; backend configuration itself is cached under `.terraform`.
+The approved bootstrap created the private, versioned `homelab-tfstate` bucket; the real root now initializes against it. For recreation, supply an approved private versioned bucket first. State is encrypted at rest by OCI. Use a dedicated bucket with bucket-scoped IAM, no public/PAR access, versioning, audit logging, and backend locks. Never share plan/state artifacts publicly. Bucket policy needs `OBJECT_INSPECT`, `OBJECT_READ`, `OBJECT_CREATE`, `OBJECT_DELETE` for the state and lock objects; separate administrators manage the bucket. Do not disable locking or force-unlock another writer. No credentials belong in `backend.hcl`; backend configuration itself is cached under `.terraform`.
 
 Example policy, replace group/compartment/bucket names:
 

@@ -11,7 +11,7 @@ One OCI Terraform root, provider 9.11.0 with lockfile, exact requested paid matr
 | Check | Result and limit |
 |---|---|
 | `terraform fmt -check` | Pass on actual `oci/terraform/` root |
-| `terraform init -backend=false -input=false` | Pass; official provider downloaded, lockfile committed. No real remote state bucket is available yet |
+| `terraform init -backend=false -input=false` | Pass; official provider downloaded, lockfile committed. Initially backend-disabled; approved bootstrap now created private versioned state and real backend init passes |
 | `terraform validate` | Pass on actual root |
 | Preservation plan against live OCI | Pass in private temporary diagnostic copy using local backend and **exceptional retained-resource targets**: **12 imports, 0 additions, 0 changes, 0 deletions**. All 12 resource actions are `no-op`. [Sanitized summary](import-plan-summary.json). No apply/import executed |
 | Plan destruction guard | Pass on preservation plan JSON |
@@ -38,7 +38,7 @@ Provider/backend diagnostics and raw plans contain infrastructure details and re
 
 ## Deployment and unresolved prerequisites
 
-Nothing in this delivery has been deployed. No Terraform apply, authoritative state import, paid upload, image import, resource cleanup, guest provisioning, Argo sync or merge was performed. OCI access remained read-only. Authorized destructive Windows preparation was limited to disposable local clones; the original MPMB VM was resumed from managed-save. Kubernetes checks were dry-runs.
+The user-approved €5 state/image stage has created the private versioned state bucket and applied exactly one Terraform image-bucket addition against that remote backend. Image upload/import is in progress. No compute apply, retained-resource import, live ACL change, resource cleanup, OCI guest provisioning, Argo sync or merge was performed. Authorized destructive Windows preparation was limited to disposable local clones; the original MPMB VM was resumed from managed-save. Kubernetes checks were dry-runs.
 
 1. **Thor access migration/recovery**: the Bitwarden agent identity was recovered and read-only guest/data inventory succeeded with sudo. Docker/containerd/Tailscale versions, root UUID, ample resources and absence of game containers/data were checked. SSH currently listens only on its tailnet IP; private listener, router advertisement/grants, persistent firewall and OCI console recovery remain pending. An age-encrypted configuration/access backup was captured outside Git before migration. `bootstrap-router.yaml` preserves the tailnet listener while preparing private SSH. No live host change was made.
 2. **Windows 11 OCI image/security/boot-volume path**: local MPMB Windows 11 Pro source was inspected and a hash-verified 80 GiB offline-checkpoint clone passed `qemu-img check`. Current source guest reports TPM2 and Secure Boot enabled; installer bypass flags are also present. Old staged storage drivers produced Code 52 and failed boot on the clone. Updated signed VirtIO 0.1.302 drivers now boot with Secure Boot and TPM enabled. The Windows 11-specific Oracle guide documents UEFI/Secure Boot custom-image preparation, conflicting with generic shielded restrictions; actual image/E4 compatibility still needs approved testing. Its import guide says 256 GB but its linked boot-volume guide says the image default or 50 GB for current images, so the earlier hard 256 GB claim is withdrawn. Keep 100 GB and verify the actual imported-image minimum. Source acquisition, clone sanitization and generalization are complete. OCI import and live private RDP remain pending approval. No source VM mutation, security bypass or allocation substitution was made.
@@ -139,6 +139,11 @@ The third review's functional findings are addressed: projection fields record t
 
 ## State/image bootstrap review
 
-The image source bucket is defined in the same Terraform root, with NoPublicAccess, Standard storage, no redundant object versioning and prevent_destroy. Its isolated diagnostic target plan contains exactly one bucket creation and no imports/updates/deletions or compute/network changes. `image-bucket-plan-summary.json` records the result. The migration guide identifies the finalized image hash, private state/image bucket identities, separate approval stages and a proposed €5 storage/request ceiling before any compute launch; no stage has been applied.
+The image source bucket is defined in the same Terraform root, with NoPublicAccess, Standard storage, no redundant object versioning and prevent_destroy. Its isolated diagnostic target plan contains exactly one bucket creation and no imports/updates/deletions or compute/network changes. `image-bucket-plan-summary.json` records the result. The migration guide identifies the finalized image hash, private state/image bucket identities, separate approval stages and a proposed €5 storage/request ceiling before any compute launch; the user subsequently approved this stage up to €5; remote backend initialization and the one-bucket apply pass.
 
 Thor's age-encrypted configuration/access archive was captured outside Git using the existing repository recipient. Decryption and tar integrity were verified through a stream without writing a plaintext archive or age identity. SSH/netplan/Docker/systemd/authorized_keys and Tailscale state are included; this is a configuration recovery backup, not a full disk snapshot. The source was read only.
+
+
+## Fourth CodeRabbit review
+
+All four findings were fixed in atomic commits and individually confirmed by CodeRabbit: targeted ACL bootstrap planning, a separate 730-hour billing period for credit duration, DAILY month-to-date usage aggregation, and the documented single-writer/recovery saved-plan invalidation procedure for provider updates without ETag protection. A zero-Wings-runtime estimate still has positive storage/Windows cost and credit duration. The live daily query succeeds; synthetic repeated rows sum by service while currencies remain separate and unknown costs are excluded. The requested additional full review is rate-limited; current head is not yet claimed fully reviewed.
