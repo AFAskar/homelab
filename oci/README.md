@@ -33,7 +33,7 @@ The state bucket is a bootstrap prerequisite outside this root so it survives in
 
 ## Tailnet policy as code
 
-The same Terraform root manages the existing tailnet’s complete policy using `tailscale_acl.tailnet`, with `ansible/tailscale/policy.hujson` as its single reviewed source. Provider 0.29.3 validates syntax and embedded tests against the Tailscale API during planning. An import block reads the existing policy before proposing a change; automatic overwrite is disabled. `prevent_destroy` and `reset_acl_on_destroy=false` protect against deleting ownership or restoring a default allow-all policy. Do not manage this same policy from a second root or an automatic console/GitOps writer.
+The same Terraform root manages the existing tailnet’s complete policy using `tailscale_acl.tailnet`, with `ansible/tailscale/policy.hujson` as its single reviewed source. Provider 0.29.3 validates syntax and embedded tests against the Tailscale API during planning. An import block reads the existing policy before proposing a change; creation without import is disabled. `prevent_destroy` and `reset_acl_on_destroy=false` protect against deleting ownership or restoring a default allow-all policy. Do not manage this same policy from a second root or an automatic console/GitOps writer.
 
 Bootstrap one OAuth trust credential in the existing tailnet with **Policy File read/write only**. Save its Client ID and secret in the ignored, owner-only `oci/ansible/secrets/tailscale-client-id` and `tailscale-client-secret` files (mode 0600), then configure the provider without putting secrets in Terraform inputs/state:
 
@@ -43,7 +43,7 @@ export TAILSCALE_OAUTH_CLIENT_SECRET="file:$PWD/oci/ansible/secrets/tailscale-cl
 terraform -chdir=oci/terraform plan -target=tailscale_acl.tailnet -out=policy-review.tfplan
 ```
 
-Use the protected OCI backend before authoritative import/apply. An isolated targeted policy plan may be reviewed before the full OCI deployment is ready; this is a bootstrap exception, not the routine deployment workflow. An ACL plan is validation/review only. Obtain access-change approval before applying its policy update. The browser is used for initial credential bootstrap and recovery, not routine policy edits. Its unsaved preview was discarded; the live allow-all policy is unchanged.
+Use the protected OCI backend before authoritative import/apply. An isolated targeted policy plan may be reviewed before the full OCI deployment is ready; this is a bootstrap exception, not the routine deployment workflow. An ACL plan is validation/review only. Obtain access-change approval before applying its policy update. The browser is used for initial credential bootstrap and recovery, not routine policy edits. Provider 0.29.3 has no ETag guard on policy updates; `overwrite_existing_content=false` protects creation only. Use one operator/writer at a time. Before a console recovery edit, stop pending applies and invalidate every saved plan containing this policy. Reconcile the recovery policy into Git and generate/review a fresh plan before resuming. Follow the recovery procedure in operations.md; never apply a pre-recovery plan. Its unsaved preview was discarded; the live allow-all policy is unchanged.
 
 ## Guest configuration and GitOps
 
