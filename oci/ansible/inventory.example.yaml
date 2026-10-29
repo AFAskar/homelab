@@ -50,10 +50,10 @@ all:
     homelab:
       hosts:
         pos:
-          ansible_host: 192.168.1.28
+          # Use the existing pos SSH alias, which currently reaches its LAN address.
           ansible_user: pos
         optiplex:
-          ansible_host: 192.168.1.27
+          ansible_ssh_common_args: "-o HostName=100.77.7.115" # preserve the optiplex SSH alias/identity
           ansible_user: run-barry-run
           ansible_become_method: doas
       vars:
