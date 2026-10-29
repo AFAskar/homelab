@@ -1,0 +1,14 @@
+{
+  "checked_utc": "2026-10-29T09:03:36.406059+00:00",
+  "source_object_bytes": 17315330048,
+  "source_sha256_metadata_matches": true,
+  "source_upload": "complete",
+  "image_ocid": "ocid1.image.oc1.me-riyadh-1.aaaaaaaa2ua6zisc4bwmbhfnsv4hl55rsnkgflvoz53uib7wpofqejodaneq",
+  "image_state": "IMPORTING",
+  "api_os_metadata": "Custom/Custom; Windows11 update follows successful import",
+  "first_create_error": "HTTP400 Invalid operatingSystemVersion: Windows11",
+  "retry": "Import without OS metadata, then UpdateImage per Oracle Windows image workflow; reuse committed upload",
+  "compute_instance_created": false,
+  "windows_compatibility_verified": false,
+  "support_constraint": "Regular Compute custom-image Secure Boot support remains unresolved; metadata acceptance alone does not establish support"
+}
