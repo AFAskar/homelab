@@ -27,7 +27,11 @@ Example policy, replace group/compartment/bucket names:
 ```text
 Allow group HomelabTerraform to manage objects in compartment Ymir where target.bucket.name = 'homelab-tfstate'
 Allow group HomelabTerraform to read buckets in compartment Ymir where target.bucket.name = 'homelab-tfstate'
+Allow group HomelabTerraform to read buckets in compartment Ymir where target.bucket.name = 'homelab-win11-images'
+Allow group HomelabTerraform to {OBJECT_CREATE, OBJECT_OVERWRITE, OBJECT_INSPECT, OBJECT_READ} in compartment Ymir where target.bucket.name = 'homelab-win11-images'
 ```
+
+The image grant supports hash/object inspection, multipart upload and image-source reading without object-deletion permission. OCI requires OBJECT_CREATE and OBJECT_OVERWRITE for multipart parts, and BUCKET_READ plus OBJECT_READ to commit them; see the [official operation permissions](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/objectstoragepolicyreference.htm). CLI `--no-overwrite` and the digest guard still protect the selected source object. Bucket creation/management and Compute image import require separate compartment-scoped rights; this example covers storage objects, not a complete Terraform deployment role.
 
 The state bucket is a bootstrap prerequisite outside this root so it survives infrastructure teardown. Reuse an approved existing bucket if available. Backup-bucket access belongs to a separate bucket-scoped writer/restore-reader identity, not public access keys or tenancy-wide credentials on Wings.
 
