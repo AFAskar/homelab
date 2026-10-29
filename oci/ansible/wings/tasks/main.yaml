@@ -55,7 +55,8 @@
     owner: root
     group: root
     mode: '0750'
-  loop: [/etc/pelican, /etc/pelican/tls, /var/run/wings, /var/lib/pelican, /var/log/pelican]
+  # systemd owns /run/wings through RuntimeDirectory in the service unit.
+  loop: [/etc/pelican, /etc/pelican/tls, /var/lib/pelican, /var/log/pelican]
 - name: Install homelab root CA for Wings Panel callbacks
   ansible.builtin.copy:
     src: "{{ homelab_ca_local }}"
@@ -77,15 +78,38 @@
     checksum: "sha256:{{ wings_checksums[wings_arch] }}"
     mode: '0755'
   notify: Restart wings
-- name: Copy Panel-generated config without logging tokens
+- name: Inspect current Wings configuration
+  ansible.builtin.stat:
+    path: /etc/pelican/config.yml
+    get_checksum: false
+  register: wings_config_stat
+- name: Read current configuration without logging tokens
+  ansible.builtin.slurp:
+    src: /etc/pelican/config.yml
+  register: wings_previous_config
+  when: wings_config_stat.stat.exists
+  no_log: true
+- name: Compare managed fields while preserving Wings-generated defaults
+  ansible.builtin.set_fact:
+    wings_desired_config: "{{ lookup('file', wings_config_local) | from_yaml }}"
+    wings_current_config: "{{ wings_previous_config.content | default('e30=') | b64decode | from_yaml | default({}, true) }}"
+  no_log: true
+- name: Reconcile changed Panel fields without rewriting generated defaults
   ansible.builtin.copy:
-    src: "{{ wings_config_local }}"
+    content: "{{ wings_current_config | combine(wings_desired_config, recursive=true) | to_nice_yaml }}"
     dest: /etc/pelican/config.yml
     owner: root
     group: root
     mode: '0600'
   no_log: true
+  when: wings_current_config | combine(wings_desired_config, recursive=true) != wings_current_config
   notify: Restart wings
+- name: Protect the installed configuration even when its content is unchanged
+  ansible.builtin.file:
+    path: /etc/pelican/config.yml
+    owner: root
+    group: root
+    mode: '0600'
 - name: Read installed Wings config for data path and TLS checks
   ansible.builtin.slurp:
     src: /etc/pelican/config.yml
