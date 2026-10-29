@@ -42,10 +42,25 @@ with tempfile.TemporaryDirectory(prefix='homelab-leaf-certs-') as staging:
         target = destination / name
         target.mkdir(mode=0o700, parents=True, exist_ok=True)
         target.chmod(0o700)
-        for field in ['tls.crt', 'tls.key']:
-            # Stage on the destination filesystem for atomic file replacement.
-            with tempfile.NamedTemporaryFile(dir=target, delete=False) as output:
-                output.write((directory / field).read_bytes())
-                temporary = Path(output.name)
-            os.replace(temporary, target / field)
+        # Stage both files and rollback copies before touching the current pair.
+        # Run the exporter to completion before invoking either guest playbook.
+        with tempfile.TemporaryDirectory(prefix='.tls-export-', dir=target) as transaction:
+            transaction = Path(transaction)
+            fields = ['tls.crt', 'tls.key']
+            existed = {}
+            for field in fields:
+                (transaction / field).write_bytes((directory / field).read_bytes())
+                existed[field] = (target / field).exists()
+                if existed[field]:
+                    (transaction / (field + '.previous')).write_bytes((target / field).read_bytes())
+            try:
+                for field in fields:
+                    os.replace(transaction / field, target / field)
+            except OSError:
+                for field in fields:
+                    if existed[field]:
+                        os.replace(transaction / (field + '.previous'), target / field)
+                    else:
+                        (target / field).unlink(missing_ok=True)
+                raise
         print(f'{name}: verified TLS bundle exported to ignored Ansible secrets')
