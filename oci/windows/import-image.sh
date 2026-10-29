@@ -48,7 +48,7 @@ if [[ $exists == True ]]; then
   stored_digest=$(oci os object head --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --name "$object" --query '"opc-meta-sha256"' --raw-output)
   [[ $stored_digest == "$digest" ]] || { echo 'Existing object lacks matching SHA256 metadata; inspect it manually.' >&2; exit 2; }
 else
-  oci os object put --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --name "$object" --file "$1" --no-overwrite --metadata "{\"sha256\":\"$digest\"}"
+  oci os object put --namespace-name "$OCI_IMAGE_NAMESPACE" --bucket-name "$OCI_IMAGE_BUCKET" --name "$object" --file "$1" --no-overwrite --metadata "{\"sha256\":\"$digest\"}" >&2
 fi
 source_details=$(python3 - "$OCI_IMAGE_NAMESPACE" "$OCI_IMAGE_BUCKET" "$object" <<'ENDPY'
 import json,sys

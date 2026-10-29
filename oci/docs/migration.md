@@ -18,7 +18,17 @@ terraform -chdir=oci/terraform show image-bucket.tfplan
 terraform -chdir=oci/terraform apply image-bucket.tfplan
 ```
 
-Set `OCI_IMAGE_NAMESPACE`/`OCI_IMAGE_BUCKET` from `terraform output -json windows_image_bucket`, and `OCI_COMPARTMENT_OCID` to Ymir’s compartment **OCID**, not its display name: `export OCI_COMPARTMENT_OCID=ocid1.compartment.oc1..aaaaaaaavoznuamfvzwjj2n4ae3xbtgxkskv7kuqexsu4oqp3jxjmrj4proq`. Set `OCI_WIN11_COMPATIBILITY_EVIDENCE` to the reviewed local evidence file and `OCI_APPROVED_IMAGE_SHA256` to the exact digest above. Only within the approved image operation, run `OCI_APPROVE_IMAGE_IMPORT=yes oci/windows/import-image.sh oci/windows/work/win11-import.qcow2`, capture the resulting custom-image OCID, then run the equally approved `configure-image.sh`. Inspect accepted image/shape capabilities and the boot minimum. These API checks record preparation results, not proof that a regular Compute Secure Boot launch is supported. Keep `windows_compatibility_verified=false` until a documented service-supported path is established as described below.
+Set `OCI_IMAGE_NAMESPACE`/`OCI_IMAGE_BUCKET` from `terraform output -json windows_image_bucket`, and `OCI_COMPARTMENT_OCID` to Ymir’s compartment **OCID**, not its display name: `export OCI_COMPARTMENT_OCID=ocid1.compartment.oc1..aaaaaaaavoznuamfvzwjj2n4ae3xbtgxkskv7kuqexsu4oqp3jxjmrj4proq`. Set `OCI_WIN11_COMPATIBILITY_EVIDENCE` to the reviewed local evidence file and `OCI_APPROVED_IMAGE_SHA256` to the exact digest above. Only within the approved image operation, keep the approval variable in scope for both scripts and capture the OCID only after successful import:
+
+```bash
+(
+  export OCI_APPROVE_IMAGE_IMPORT=yes
+  IMAGE_OCID="$(oci/windows/import-image.sh oci/windows/work/win11-import.qcow2)" || exit 1
+  oci/windows/configure-image.sh "$IMAGE_OCID"
+)
+```
+
+The importer sends upload responses to stderr and returns only the resulting image OCID on stdout. Inspect accepted image/shape capabilities and the boot minimum. These API checks record preparation results, not proof that a regular Compute Secure Boot launch is supported. Keep `windows_compatibility_verified=false` until a documented service-supported path is established as described below.
 
 The next approval stage is a complete saved infrastructure plan with current costs. Applying the restrictive tailnet policy/access migration also needs explicit access-change approval. Neither stage is authorized by the image/storage approval. Keep source images and Thor/shared infrastructure protected; cleanup and merge require their own explicit instruction.
 
