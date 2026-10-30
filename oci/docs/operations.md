@@ -13,6 +13,8 @@ The policy source is `ansible/tailscale/policy.hujson`. Maintain the following s
 | azoz-laptop + freyr | pos, optiplex, Thor/router | OpenSSH TCP/22 |
 | azoz-laptop | freyr | SSH TCP/22 and RDP TCP/3389 |
 | Both admin clients | pos/optiplex tailnet and known LAN addresses | HTTP/HTTPS TCP/80,443 |
+| Owner iPhone (100.88.31.107) | pos/optiplex tailnet addresses | HTTP/HTTPS TCP/80,443 |
+| Owner iPhone | Wings subnet | HTTPS Wings browser console/API TCP/8080 |
 | Both admin clients | pos tailnet/known LAN address | Kubernetes API 6443, AdGuard UI 3000, DNS TCP/UDP 5353 |
 | Both admin clients | 10.10.50.0/24 Wings subnet | SSH 22, Wings API 8080, SFTP 2022, metrics 9100 |
 | Both admin clients | 10.10.10.0/24 Windows subnet | TCP/3389 only |
@@ -20,7 +22,9 @@ The policy source is `ansible/tailscale/policy.hujson`. Maintain the following s
 | Thor/router tag | pos tailnet address | TCP/8443, authenticated Panel daemon API only |
 | Other tailnet devices | Infrastructure | No grant; default denied |
 
-`azoz-laptop` (100.66.202.74) and `freyr` (100.82.125.5) are the trusted admin clients. The verified tailnet owner account can assign `tag:oci-router`, but owning a device does not automatically grant it network administration access. Other members' devices, the owner's phone and the old home-router device are denied administrative/application access unless a later explicit rule is reviewed. Tailnet members retain TCP/UDP 53 to pos for the existing `home.internal` split-DNS resolver; pos redirects that traffic to AdGuard on 5353. This DNS-only exception does not grant server administration. Align the router's `router_tailnet_admin_sources` with these two admin IPs. Review this trust choice before applying.
+`azoz-laptop` (100.66.202.74) and `freyr` (100.82.125.5) are the trusted admin clients. The verified tailnet owner account can assign `tag:oci-router`, but owning a device does not automatically grant it network administration access. The owner's iPhone has web access and Wings browser-console access only; SSH, SFTP, metrics, Kubernetes API, AdGuard UI, RDP and the dedicated callback listener remain denied. Other members' devices and the old home-router device have no application or administration grant. Tailnet members retain TCP/UDP 53 to pos for the existing `home.internal` split-DNS resolver; pos redirects that traffic to AdGuard on 5353. This DNS-only exception does not grant server administration. Align the router's `router_tailnet_admin_sources` with these two admin IPs. Review this trust choice before applying.
+
+On the iPhone, connect Tailscale and enable its DNS settings before opening `https://pelican.home.internal`. Install the public `pki/homelab-root-ca.crt` certificate as an iOS configuration profile and enable it under Settings → General → About → Certificate Trust Settings. Transfer only this public certificate; never a CA private key. A certificate warning after connectivity works requires checking this trust setting and the hostname, rather than bypassing TLS.
 
 This is an IPv4 management policy; native IPv6 and ICMP are not granted. Use the documented IPv4 private/tailnet addresses for connection checks; routing health probes use TCP rather than ping. Known homelab LAN /32 rules only authorize traffic: they do not create a home subnet route or revive the offline home router. Public game clients use public OCI game addresses and are outside these tailnet grants. Kubernetes node-to-node LAN/CNI traffic is not altered by a tailnet policy.
 

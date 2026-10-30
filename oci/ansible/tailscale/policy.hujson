@@ -69,6 +69,30 @@
     },
     {
       "src": [
+        "owner-phone"
+      ],
+      "dst": [
+        "pos",
+        "optiplex"
+      ],
+      "ip": [
+        "tcp:80",
+        "tcp:443"
+      ]
+    },
+    {
+      "src": [
+        "owner-phone"
+      ],
+      "dst": [
+        "oci-wings-subnet"
+      ],
+      "ip": [
+        "tcp:8080"
+      ]
+    },
+    {
+      "src": [
         "admin-laptop",
         "admin-freyr"
       ],
@@ -297,9 +321,23 @@
       "proto": "tcp",
       "deny": [
         "pos:22",
-        "pos:443",
+        "pos:6443",
+        "pos:3000",
+        "pos:8443",
+        "pos:32443",
+        "optiplex:22",
         "wings-04-private:22",
-        "10.10.10.20:3389"
+        "wings-04-private:2022",
+        "wings-04-private:9100",
+        "10.10.10.20:3389",
+        "admin-freyr:3389"
+      ],
+      "accept": [
+        "pos:80",
+        "pos:443",
+        "optiplex:443",
+        "wings-04-private:8080",
+        "10.10.50.216:8080"
       ]
     },
     {
@@ -325,9 +363,6 @@
     {
       "src": "other-member-desktop",
       "proto": "udp",
-      "accept": [
-        "pos:53"
-      ],
       "deny": [
         "pos:5353",
         "wings-04-private:8080"
@@ -340,8 +375,18 @@
         "pos:53"
       ],
       "deny": [
-        "pos:22",
-        "pos:443"
+        "pos:22"
+      ]
+    },
+    {
+      "src": "owner-phone",
+      "proto": "udp",
+      "accept": [
+        "pos:53"
+      ],
+      "deny": [
+        "pos:5353",
+        "wings-04-private:8080"
       ]
     }
   ],
