@@ -11,7 +11,7 @@ authorized. Full-root planning remains blocked by the Windows compatibility
 precondition; staged non-Windows reconciliation has no changes.
 
 
-**Only the user-approved €5 state/image stage is in progress.** Private state and image buckets were created, and the real root initialized against remote state. No compute, ACL/access migration, retained-resource import, cleanup or merge has been executed. Full deployment awaits imported-image capability checks, Thor private routing and the separately approved full launch plan. Read the validation report before using these steps.
+**Current approvals and execution:** the €5 state/image stage is complete, and the separately approved non-Windows compute/import/access/Panel migration is deployed and verified. Windows launch remains blocked by the Oracle support question and still needs separate approval. Cleanup and merge remain unapproved. The stage instructions below are for historical review or a separately approved recreation; do not repeat completed imports or launches against existing resources.
 
 ## First approval stage: state and image preparation
 
