@@ -1,0 +1,99 @@
+# Run after render-inventory.py. Preserve unrelated AdGuard configuration.
+- name: Resolve OCI Wings names through the existing homelab DNS service
+  hosts: pos
+  vars:
+    adguard_config_path: /home/pos/.config/adguardhome/AdGuardHome.yaml
+    repository_root: "{{ playbook_dir }}/../.."
+    wings_dns_lines: "{{ lookup('file', playbook_dir + '/../inventory/wings.hosts').splitlines() }}"
+  tasks:
+    - name: Read existing private DNS configuration
+      ansible.builtin.slurp:
+        src: "{{ adguard_config_path }}"
+      register: adguard_config
+      no_log: true
+    - name: Build exact hostname records from Terraform outputs
+      ansible.builtin.set_fact:
+        wings_dns_records: "{{ (wings_dns_records | default([])) + [{'domain': item.split()[1], 'answer': item.split()[0]}] }}"
+      loop: "{{ wings_dns_lines }}"
+    - name: Reconcile only the four OCI hostname rewrites
+      ansible.builtin.set_fact:
+        original_dns: "{{ adguard_config.content | b64decode | from_yaml }}"
+        managed_names: "{{ wings_dns_records | map(attribute='domain') | list }}"
+      no_log: true
+    - name: Build specific OCI hostname rules
+      ansible.builtin.set_fact:
+        wings_dns_rules: >-
+          {{ (wings_dns_rules | default([])) +
+             ['||' + item.domain + '^$dnsrewrite=NOERROR;A;' + item.answer] }}
+      loop: "{{ wings_dns_records }}"
+    - name: Exclude OCI names from the existing homelab catch-all answers
+      ansible.builtin.set_fact:
+        preserved_dns_rules: >-
+          {{ (preserved_dns_rules | default([])) + [item +
+             (',denyallow=oci.home.internal' if item.startswith('||home.internal^$') and
+              'dnsrewrite=' in item and 'denyallow=' not in item else '')] }}
+      loop: "{{ original_dns.user_rules | default([]) }}"
+      no_log: true
+    - name: Preserve unrelated rewrite entries
+      ansible.builtin.set_fact:
+        desired_rewrites: >-
+          {{ original_dns.filtering.rewrites | default([]) |
+             rejectattr('domain', 'in', managed_names) | list }}
+        desired_rules: >-
+          {{ preserved_dns_rules |
+             reject('match', '^[|][|]wings-0[1-4][.]oci[.]home[.]internal') | list + wings_dns_rules }}
+      no_log: true
+    - name: Apply hostname changes while AdGuard is stopped
+      when: >-
+        (original_dns.filtering.rewrites | default([])) != desired_rewrites
+        or (original_dns.user_rules | default([])) != desired_rules
+      block:
+        - name: Preserve the prior private configuration
+          ansible.builtin.copy:
+            remote_src: true
+            src: "{{ adguard_config_path }}"
+            dest: "{{ adguard_config_path }}.before-oci"
+            mode: '0600'
+            force: false
+          no_log: true
+        - name: Stop AdGuard through the repository remote Compose wrapper
+          ansible.builtin.command:
+            argv: ["{{ repository_root }}/remotepod.sh", -f, "{{ repository_root }}/docker/adguardhome.yaml", stop, adguardhome]
+          delegate_to: localhost
+          environment:
+            ADGUARD_LAN_IP: 192.168.1.28
+            ADGUARD_TAILSCALE_IP: 100.114.113.82
+          register: adguard_stop
+          failed_when: adguard_stop.rc != 0 or 'Cannot connect to Podman' in adguard_stop.stderr
+          changed_when: true
+        - name: Write reconciled DNS configuration without exposing credentials
+          ansible.builtin.copy:
+            content: >-
+              {{ original_dns | combine({'user_rules': desired_rules, 'filtering': original_dns.filtering |
+                 combine({'rewrites': desired_rewrites})}) | to_nice_yaml(indent=2, sort_keys=false) }}
+            dest: "{{ adguard_config_path }}"
+            mode: '0600'
+          no_log: true
+      always:
+        - name: Start AdGuard through the repository remote Compose wrapper
+          ansible.builtin.command:
+            argv: ["{{ repository_root }}/remotepod.sh", -f, "{{ repository_root }}/docker/adguardhome.yaml", start, adguardhome]
+          delegate_to: localhost
+          environment:
+            ADGUARD_LAN_IP: 192.168.1.28
+            ADGUARD_TAILSCALE_IP: 100.114.113.82
+          register: adguard_start
+          failed_when: adguard_start.rc != 0 or 'Cannot connect to Podman' in adguard_start.stderr
+          changed_when: true
+    - name: Verify each hostname returns only its private OCI address
+      ansible.builtin.command:
+        argv: [dig, +short, "@192.168.1.28", -p, '5353', "{{ item.domain }}"]
+      delegate_to: localhost
+      loop: "{{ wings_dns_records }}"
+      loop_control:
+        label: "{{ item.domain }}"
+      register: dns_answer
+      changed_when: false
+      until: dns_answer.stdout_lines == [item.answer]
+      retries: 5
+      delay: 2
