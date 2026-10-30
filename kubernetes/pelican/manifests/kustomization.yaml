@@ -7,6 +7,7 @@ resources:
 - panel.yaml
 - service.yaml
 - ingress.yaml
+- callback-ingress.yaml
 - certificate.yaml
 - node-certificates.yaml
 - storage.yaml
