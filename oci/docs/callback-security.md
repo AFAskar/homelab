@@ -56,7 +56,7 @@ No new OCI instance, paid service, CA or client certificate is required.
 
 ## Verified deployment — October 30, 2026
 
-[Live checks](callback-isolation-evidence.json) verified authenticated HTTP 200
+Live checks (local report: `oci/inventory/reports/callback-isolation-evidence.json`) verified authenticated HTTP 200
 from all four Wings nodes through the proxy, HTTP 401 without a token, and
 404 for UI/admin/API paths and another hostname. Thor could not establish
 fresh connections to pos:443/:80/:32443 or optiplex:8443. LAN probes to both

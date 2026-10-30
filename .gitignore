@@ -23,3 +23,6 @@ oci/**/*.vmdk
 oci/**/*.vhd*
 oci/**/*.iso
 **/__pycache__/
+
+# Generated OCI reports belong in the private inventory, never in source docs
+oci/docs/*.json
