@@ -38,7 +38,7 @@ Run from the repository root. Confirm the image bucket values with `terraform -c
   export OCI_IMAGE_NAMESPACE=axh0rk0bydbu
   export OCI_IMAGE_BUCKET=homelab-win11-images
   export OCI_COMPARTMENT_OCID=ocid1.compartment.oc1..aaaaaaaavoznuamfvzwjj2n4ae3xbtgxkskv7kuqexsu4oqp3jxjmrj4proq
-  export OCI_WIN11_COMPATIBILITY_EVIDENCE="$PWD/oci/docs/windows-image-validation.json"
+  export OCI_WIN11_COMPATIBILITY_EVIDENCE="$PWD/oci/inventory/reports/windows-image-validation.json"
   export OCI_APPROVED_IMAGE_SHA256=c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881
   export OCI_APPROVE_IMAGE_IMPORT=yes
   IMAGE_OCID="$(oci/windows/import-image.sh oci/windows/work/win11-import.qcow2)" || exit 1
