@@ -1,0 +1,55 @@
+{
+  "_comment": "Homelab-maintained declarative egg derived from pelican-eggs/games-standalone Mindustry.",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2024-06-01T00:16:53+00:00",
+  "name": "Homelab Mindustry acceptance",
+  "author": "sir3lit@gmail.com",
+  "uuid": "e4e95a70-006a-4265-9e54-c249da571c30",
+  "description": "Native AMD64/ARM64 acceptance workload. Derived from pelican-eggs/games-standalone Mindustry; pinned v160.7 with checksum and multiarch image digests.",
+  "features": null,
+  "docker_images": {
+    "Java 21 native multiarch": "ghcr.io/pelican-eggs/yolks:java_21@sha256:1c7bf1c5f661c307b6433f1b0bb0e08567cd286b6a192874534e25e435660bd9"
+  },
+  "file_denylist": [],
+  "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar server-release.jar config port {{SERVER_PORT}},config name {{SERVER_NAME}},host {{MAPNAME}}",
+  "config": {
+    "files": "{}",
+    "startup": "{\r\n    \"done\": \"Server loaded. \"\r\n}",
+    "logs": "{}",
+    "stop": "exit"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\nset -euo pipefail\ncd /mnt/server\ncurl -fL --retry 3 -o server-release.jar https://github.com/Anuken/Mindustry/releases/download/v160.7/server-release.jar\necho \"f7b899a4038b95b14a824d5f8993984f79d73baa3254c385b6538327f9c0befd  server-release.jar\" | sha256sum -c -\n",
+      "container": "ghcr.io/pelican-eggs/installers:debian@sha256:a4fbf7119883a179a47b5e5fa1a60e7e0925f9b2ccbaf0548cfb261705304056",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Server Name",
+      "description": "The server name that shows up in the server list",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My Mindustry Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "sort": null,
+      "field_type": "text"
+    },
+    {
+      "name": "Map Name",
+      "description": "Default Maps Available: Ancient Caldera, Fork, Fortress, Glacier, Islands, Labyrinth, Maze, Shattered, Tendrils, Triad, Veins, Wasteland.\r\n\r\n(Default: Tendrils)",
+      "env_variable": "MAPNAME",
+      "default_value": "Tendrils",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "sort": null,
+      "field_type": "text"
+    }
+  ]
+}

@@ -9,7 +9,7 @@ wings_data_device: /dev/oracleoci/oraclevdb
 wings_data_mount: /srv/pelican
 wings_public_interface: REPLACE_DISCOVERED_INTERFACE
 wings_game_tcp_ports: [25565]
-wings_game_udp_ports: []
+wings_game_udp_ports: [25565]
 private_access_verified: false
 # Deliberately false: installing firewall lockdown before route verification
 # would destroy the last working access path.

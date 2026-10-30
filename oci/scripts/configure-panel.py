@@ -15,6 +15,7 @@ import subprocess
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--admin-email', required=True)
 parser.add_argument('--initialize', action='store_true', help='Initialize the configured SQLite schema on first deployment.')
+parser.add_argument('--test-games', action='store_true', help='Create the pinned native Mindustry acceptance server on each node.')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[2]
 private = root / 'oci/ansible/secrets'
@@ -116,3 +117,25 @@ for name, instance in sorted(nodes.items()):
 panel('$writer=new class {use App\\Traits\\EnvironmentWriterTrait;}; '
       '$writer->writeToEnvironment(["APP_INSTALLED"=>"true"]); echo "true";', {})
 print('Database/admin/node setup complete; web installer disabled using the release environment writer.')
+
+if args.test_games:
+    egg = json.loads((root / 'oci/pelican/egg-mindustry-acceptance.json').read_text())
+    result = panel(
+        '$e=App\\Models\\Egg::where("uuid",$data["egg"]["uuid"])->first(); '
+        '$e=$app->make(App\\Services\\Eggs\\Sharing\\EggImporterService::class)->fromContent('
+        'json_encode($data["egg"]),App\\Enums\\EggFormat::JSON,$e); '
+        '$owner=App\\Models\\User::where("email",$data["email"])->firstOrFail(); $result=[]; '
+        'foreach(App\\Models\\Node::whereIn("name",$data["nodes"])->get() as $n){ '
+        '$name="mindustry-".$n->name; '
+        '$s=App\\Models\\Server::where("node_id",$n->id)->where("name",$name)->first(); '
+        'if(!$s){$a=$n->allocations()->where("port",25565)->whereNull("server_id")->firstOrFail(); '
+        '$s=$app->make(App\\Services\\Servers\\ServerCreationService::class)->handle(['
+        '"name"=>$name,"node_id"=>$n->id,"owner_id"=>$owner->id,"egg_id"=>$e->id,'
+        '"allocation_id"=>$a->id,"memory"=>2048,"swap"=>0,"disk"=>2048,"io"=>500,'
+        '"cpu"=>200,"threads"=>null,"oom_killer"=>true,"backup_limit"=>1,'
+        '"skip_scripts"=>false,"start_on_completion"=>true,'
+        '"environment"=>["SERVER_NAME"=>$name,"MAPNAME"=>"Tendrils"]]); } '
+        '$result[]=["node"=>$n->name,"id"=>$s->id,"uuid"=>$s->uuid,"status"=>$s->status]; } '
+        'echo json_encode($result);',
+        {'egg': egg, 'email': args.admin_email, 'nodes': sorted(nodes)})
+    print(json.dumps(result, indent=2))

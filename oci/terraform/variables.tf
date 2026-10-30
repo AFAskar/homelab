@@ -47,7 +47,12 @@ variable "extra_router_private_ips" {
 variable "game_ports" {
   description = "Explicit public allocations, shared on each Wings host. Add only ports allocated in Panel."
   type        = map(object({ protocol = string, min = number, max = number }))
-  default     = { minecraft = { protocol = "6", min = 25565, max = 25565 } }
+  # Preserve the existing TCP resource address; the native Mindustry acceptance
+  # workload uses both protocols on the same allocation.
+  default = {
+    minecraft     = { protocol = "6", min = 25565, max = 25565 }
+    mindustry_udp = { protocol = "17", min = 25565, max = 25565 }
+  }
   validation {
     condition     = alltrue([for p in values(var.game_ports) : contains(["6", "17"], p.protocol) && p.min >= 1024 && p.max <= 65535 && p.min <= p.max && alltrue([for private_port in [2022, 3389, 8080, 9100] : !(p.min <= private_port && p.max >= private_port)])])
     error_message = "TCP/UDP game ranges must exclude private SFTP (2022), RDP (3389), Wings API (8080) and exporter (9100) ports."
