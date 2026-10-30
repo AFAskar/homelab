@@ -36,9 +36,14 @@ The normal HTTPS listener and administrator SSH are unaffected.
    During PR staging, pin live Argo Applications to the reviewed commit;
    do not merge or let the old main revision undo the listener change.
 4. Temporarily allow Thor both 443 and 8443 through a reviewed targeted
-   Tailscale-only Terraform plan. Test the new route before switching Caddy.
+   Tailscale-only Terraform plan. For both `thor` and `tag:oci-router` embedded
+   tests, move `pos:443` from `deny` to `accept` in that temporary policy; keep
+   `pos:8443` accepted. Tests must match the policy being planned. Test the new
+   route before switching Caddy.
 5. Run `ansible-playbook tailscale/panel-proxy.yaml` to switch the upstream.
-6. Apply the final policy, removing 443; discard all earlier policy plans.
+6. Restore the final grant and tests: remove 443 permission, move `pos:443`
+   back to `deny`, and keep `pos:8443` accepted. Plan and apply that final
+   policy; discard all earlier policy plans.
 7. Verify authenticated Wings callbacks, normal Panel UI and public games.
    From Thor, require callback requests without credentials to return 401,
    other hosts/paths to return 404, and pos:443 to be unreachable. From the
