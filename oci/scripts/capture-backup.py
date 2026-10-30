@@ -115,11 +115,18 @@ try:
                 subprocess.run(ssh + ['ubuntu@' + nodes[name]['private_ip'], command], stdout=output, check=True)
         checksums = {p.name: checksum(p) for p in staging.iterdir()}
         (staging / 'manifest.json').write_text(json.dumps({'servers': servers, 'sha256': checksums}, indent=2))
-        tar = subprocess.Popen(['tar', '-cf', '-', '-C', str(staging), '.'], stdout=subprocess.PIPE)
-        encrypted = subprocess.run(['age', '-r', recipient, '-o', str(args.output)], stdin=tar.stdout)
-        tar.stdout.close()
-        if tar.wait() or encrypted.returncode:
-            raise SystemExit('Encryption failed; retain no incomplete archive as a valid backup.')
+        # Stage on the output filesystem: publish only a complete ciphertext,
+        # without overwriting a file another writer created during capture.
+        with tempfile.TemporaryDirectory(prefix='.homelab-encrypt-', dir=args.output.parent) as encrypted_work:
+            partial = Path(encrypted_work) / args.output.name
+            with subprocess.Popen(['tar', '-cf', '-', '-C', str(staging), '.'], stdout=subprocess.PIPE) as tar:
+                try:
+                    encrypted = subprocess.run(['age', '-r', recipient, '-o', str(partial)], stdin=tar.stdout)
+                finally:
+                    tar.stdout.close()
+                if tar.wait() or encrypted.returncode:
+                    raise SystemExit('Encryption failed; incomplete ciphertext was discarded.')
+            os.link(partial, args.output)
     digest = checksum(args.output)
     args.output.with_suffix(args.output.suffix + '.sha256').write_text(digest + '  ' + args.output.name + '\n')
     print(f'Encrypted consistent backup: {args.output} SHA256 {digest}')
