@@ -1,23 +1,17 @@
 # Preservation and deployment sequence
 
-The approved non-Windows migration is complete: retained imports, private
-router/access migration, paid Linux, Panel enrollment and native games are
-live. Callback access is further restricted as documented in
-[callback security](callback-security.md). The steps below retain the
-bootstrap/recreation procedure and historical plan checkpoints; they do not
-mean those stages are still awaiting approval. See [current validation](validation.md)
-for verified outcomes and remaining Windows tests. No cleanup or merge is
-authorized. Full-root planning remains blocked by the Windows compatibility
-precondition; staged non-Windows reconciliation has no changes.
-
-
-**Current approvals and execution:** the €5 state/image stage is complete, and the separately approved non-Windows compute/import/access/Panel migration is deployed and verified. Windows launch remains blocked by the Oracle support question and still needs separate approval. Cleanup and merge remain unapproved. The stage instructions below are for historical review or a separately approved recreation; do not repeat completed imports or launches against existing resources.
+Use this sequence for importing retained resources or recreating the environment.
+Check `terraform -chdir=oci/terraform state list` before each stage so completed
+imports or existing resources are not repeated. Refresh the [inventory](existing-infrastructure.md),
+read the [cost model](costs.md), and use the [acceptance checklist](validation.md).
+Keep state/plans private, retain a working access path, and obtain approval
+before billable, destructive or irreversible operations.
 
 ## First approval stage: state and image preparation
 
-The user explicitly approved this stage up to €5 on October 29. No compute launch is included in this stage. The prepared capture is `oci/windows/work/win11-import.qcow2`, SHA256 `c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881` (17,315,330,048 bytes; 80 GiB virtual). Review `oci/inventory/reports/windows-image-validation.json` before approval. Native EUR pricing conservatively budgets 86 GB custom image plus 18 GB upload at €2.47 per full month, plus state-object storage/requests. A €5 storage/request ceiling for this stage leaves room for small versioned state files; this is an approval bound, not an OCI-enforced cap. Stop and request a change if projected charges exceed it. No deletion is authorized.
+Prepare a separate storage/image plan and spending bound before this stage; it does not authorize compute launch. The prepared capture is `oci/windows/work/win11-import.qcow2`, SHA256 `c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881` (17,315,330,048 bytes; 80 GiB virtual). Review `oci/inventory/reports/windows-image-validation.json` before approval. Native EUR pricing conservatively budgets 86 GB custom image plus 18 GB upload at €2.47 per full month, plus state-object storage/requests. A €5 storage/request ceiling for this stage leaves room for small versioned state files; this is an approval bound, not an OCI-enforced cap. Stop and request a change if projected charges exceed it. No deletion is authorized.
 
-After explicit approval, create the dedicated private state bucket `homelab-tfstate` in Ymir / namespace `axh0rk0bydbu`, with Standard storage, versioning Enabled, and NoPublicAccess. Verify those settings and no PAR; initialize the real OCI backend with its identity. Existing API credentials already permit bootstrap; no new credential is requested. A dedicated bucket-scoped operator policy is documented in the README; do not place tenancy credentials on guests.
+After explicit approval, create the dedicated private state bucket `homelab-tfstate` in Ymir / namespace `axh0rk0bydbu`, with Standard storage, versioning Enabled, and NoPublicAccess. Verify those settings and no PAR; initialize the real OCI backend with its identity. Use an authorized OCI profile with the required bucket/image permissions. A dedicated bucket-scoped operator policy is documented in the README; do not place tenancy credentials on guests.
 
 Use the single Terraform root for the image-source bucket. The isolated read-only diagnostic plan proposes exactly one private bucket addition, no imports/updates/deletions and no compute or networking changes; see `oci/inventory/reports/image-bucket-plan-summary.json`. Regenerate and review this exceptional bootstrap plan against protected state before applying it:
 

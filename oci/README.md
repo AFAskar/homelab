@@ -1,6 +1,10 @@
 # OCI Pelican infrastructure
 
-**The approved non-Windows environment is deployed.** Four Wings nodes, private subnet routing, restrictive Tailscale grants and Panel are running. Thor's access to shared homelab HTTPS has been removed; [callback isolation](docs/callback-security.md) restricts it to Panel's authenticated daemon API on a dedicated listener. Windows has an AVAILABLE imported image but remains blocked by Oracle's regular Compute Secure Boot/TPM support question. Windows launch, cleanup and merge have not been performed. See [validation](docs/validation.md) for the broader acceptance checklist; historical readiness records describe earlier phases.
+Terraform manages OCI compute, storage, networking and the tailnet policy.
+Ansible configures Wings, subnet routing and host services; Argo CD manages
+Pelican Panel in the existing Kubernetes cluster. Start with the
+[inventory](docs/existing-infrastructure.md), [deployment sequence](docs/migration.md),
+[cost model](docs/costs.md) and [acceptance checks](docs/validation.md).
 
 One Terraform root lives in `oci/terraform/`. It preserves Thor as logical `wings-04`, its 100 GB boot disk, and the existing Jotunheim network. Three paid E6 nodes have exactly 2 OCPUs, 16 GB RAM, 50 GB boot and 200 GB data each. Windows is a required E4 instance (2 OCPUs, 16 GB RAM, 100 GB boot), guarded against deployment without verified Windows 11 compatibility. No other paid router or new network is introduced.
 
@@ -15,8 +19,8 @@ Use Terraform 1.12+ (OCI backend locking), OCI provider 9.11.0 and Tailscale pro
 ```bash
 export OCI_TENANCY_OCID=... # profile tenancy OCID
 oci/scripts/inventory.sh
-cp oci/terraform/terraform.tfvars.example oci/terraform/terraform.tfvars
-cp oci/terraform/backend.hcl.example oci/terraform/backend.hcl
+test -e oci/terraform/terraform.tfvars || cp oci/terraform/terraform.tfvars.example oci/terraform/terraform.tfvars
+test -e oci/terraform/backend.hcl || cp oci/terraform/backend.hcl.example oci/terraform/backend.hcl
 terraform -chdir=oci/terraform init -backend-config=backend.hcl
 terraform -chdir=oci/terraform fmt -check
 terraform -chdir=oci/terraform validate
@@ -24,7 +28,7 @@ terraform -chdir=oci/terraform plan -out=review.tfplan
 terraform -chdir=oci/terraform show -json review.tfplan | python3 oci/scripts/check-plan.py
 ```
 
-The approved bootstrap created the private, versioned `homelab-tfstate` bucket; the real root now initializes against it. For recreation, supply an approved private versioned bucket first. State is encrypted at rest by OCI. Use a dedicated bucket with bucket-scoped IAM, no public/PAR access, versioning, audit logging, and backend locks. Never share plan/state artifacts publicly. Bucket policy needs `OBJECT_INSPECT`, `OBJECT_READ`, `OBJECT_CREATE`, `OBJECT_DELETE` for the state and lock objects; separate administrators manage the bucket. Do not disable locking or force-unlock another writer. No credentials belong in `backend.hcl`; backend configuration itself is cached under `.terraform`.
+Use the private, versioned `homelab-tfstate` bucket for the backend. For recreation, supply an approved private versioned bucket before initializing the root. State is encrypted at rest by OCI. Use a dedicated bucket with bucket-scoped IAM, no public/PAR access, versioning, audit logging, and backend locks. Never share plan/state artifacts publicly. Bucket policy needs `OBJECT_INSPECT`, `OBJECT_READ`, `OBJECT_CREATE`, `OBJECT_DELETE` for the state and lock objects; separate administrators manage the bucket. Do not disable locking or force-unlock another writer. No credentials belong in `backend.hcl`; backend configuration itself is cached under `.terraform`.
 
 Example policy, replace group/compartment/bucket names:
 
@@ -78,4 +82,9 @@ Panel manifests live at `kubernetes/pelican/`, following the existing layout, CA
 
 [Operations](docs/operations.md) covers private TLS/DNS, enrollment, backups, monitoring, Windows tooling and recovery. [Architecture](docs/architecture.md) records network flows and ARM limitations. Billable deployment, cleanup and merge require explicit approval; a passing static check is not deployment approval.
 
-Windows source follow-up: the existing MPMB Windows 11 Pro VM was inspected and a verified offline checkpoint was cloned locally outside Git (the test clone is under `~/VirtualMachines/oci-win11-validation/`). `oci/windows/clone-checkpoint.py` reproduces this without touching the running VM; `oci/windows/inspect-source.ps1` records read-only guest checks. The clone has been sanitized and Sysprep shut down; its final offline capture and local validation are recorded in oci/inventory/reports/windows-image-validation.json (local report: `oci/inventory/reports/windows-image-validation.json`). OCI import and Windows11 metadata update succeeded; no OCI VM boot has occurred. Oracle's Windows import guide states 256 GB, but its [boot-volume guide](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/bootvolumes.htm#Custom) states the image default or 50 GB for current images, reserving 256 GB for older Windows images. This documentation conflict is not a proven 100 GB launch failure. Keep the requested 100 GB and check imported-image metadata before deployment.
+For Windows image preparation, use a separate MPMB checkpoint clone with
+`oci/windows/clone-checkpoint.py` and inspect it with `inspect-source.ps1`.
+Follow the [Windows rebuild procedure](docs/operations.md#windows-lifecycle)
+for signed drivers, sanitization, generalization and capture. Preserve the
+source VM. Keep the approved 100 GB boot allocation and verify actual imported
+image capabilities and regular Compute Secure Boot/TPM support before launch.

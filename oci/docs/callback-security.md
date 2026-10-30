@@ -54,19 +54,28 @@ errors. Recover the dedicated endpoint using existing administrator SSH.
 Do not casually restore shared 443 access or apply an old saved policy plan.
 No new OCI instance, paid service, CA or client certificate is required.
 
-## Verified deployment — October 30, 2026
+## Check access
 
-Live checks (local report: `oci/inventory/reports/callback-isolation-evidence.json`) verified authenticated HTTP 200
-from all four Wings nodes through the proxy, HTTP 401 without a token, and
-404 for UI/admin/API paths and another hostname. Thor could not establish
-fresh connections to pos:443/:80/:32443 or optiplex:8443. LAN probes to both
-hosts' callback and NodePort addresses were blocked.
+From Thor, request `https://pelican.home.internal:8443/api/remote/servers`
+against pos's tailnet IP with verified Panel SNI/CA. Require 401 without a
+node token and 200 with the appropriate token. Do not put a node token in a
+shell command, process argument or committed report. Supply it through a
+private stdin/request mechanism.
 
-The parent `homelab` Argo Application temporarily ignores only the
+Check that `/`, `/admin`, `/api/client`, `/api/application` and another
+hostname return 404 on this listener. Fresh connections from Thor to pos:443,
+pos:80 and the alternate NodePort must fail. Test callback/NodePort blocking
+from the LAN too. Repeat authenticated callbacks from each Wings node and
+check the normal Panel UI and game probes after a change.
+
+## Stage an unmerged change
+
+If deploying a reviewed unmerged change, configure the parent `homelab` Argo
+Application to ignore only the
 `traefik-config` Application's `/spec/source/targetRevision`, with
 `RespectIgnoreDifferences=true`, so its self-heal cannot reset the reviewed
 PR revision to old main. Other applications continue their normal sync.
 After an approved merge, set the child revision to main, then remove that
 specific ignoreDifferences entry (and the respect option if no other rule
-needs it). The previous parent spec is retained privately for comparison.
+needs it). Save the previous parent spec privately for comparison.
 Do not remove this staging exception before main contains the listener.

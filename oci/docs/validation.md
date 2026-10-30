@@ -1,104 +1,125 @@
-# Validation and acceptance
+# Deployment checks
 
-## Current status — October 30, 2026
+Run checks from the repository root after an approved change. Store raw plans,
+logs, billing snapshots and reports under ignored `oci/inventory/`. Record
+change-specific results and limitations in the PR, not in this runbook.
 
-The user approved the non-Windows deployment and access migration. That stage
-is deployed. Windows is required but remains blocked by Oracle's regular
-Compute Secure Boot/TPM support question. No Windows VM has been launched;
-merge, destructive cleanup and Windows launch remain unapproved.
+## Source and Terraform
 
-Generated reports, plans, billing snapshots and raw logs stay in ignored
-`oci/inventory/`, with reports under `oci/inventory/reports/`. They are local
-run artifacts, not source configuration or substitutes for fresh checks.
-No secrets, raw state, images or decrypted manifest builds belong in Git.
+Load the OCI profile, backend configuration and scoped Tailscale OAuth file
+references described in the README. Load the existing SOPS age identity for
+Kubernetes builds and DNS deployment.
 
-## Deployed and verified
+```bash
+terraform -chdir=oci/terraform fmt -check
+terraform -chdir=oci/terraform init -backend-config=backend.hcl -lockfile=readonly
+terraform -chdir=oci/terraform validate
+terraform -chdir=oci/terraform plan -out=review.tfplan
+terraform -chdir=oci/terraform show -json review.tfplan | python3 oci/scripts/check-plan.py
+python3 oci/scripts/test-lifecycle.py
+```
 
-| Area | Evidence and limits |
-|---|---|
-| Retained OCI resources | 12 authoritative imports; import apply added/changed/destroyed nothing. Thor remains A1 ARM64 4 OCPUs/24 GB/100 GB, with original storage and direct tailnet SSH preserved. Shared networking retained |
-| Paid Linux | Three Ubuntu 26.04 E6.Flex nodes at exactly 2 OCPUs/16 GB, 50 GB boot + 200 GB data each. Data mounted ext4 by UUID; initialization disabled after the new disks were prepared |
-| State and plans | Real private versioned OCI backend works. Non-Windows targeted reconciliation reported no changes. Full-root planning correctly fails the Windows compatibility precondition; a clean full environment plan is not claimed |
-| Private access | Fresh private SSH to all four nodes passed. Thor's two advertised OCI subnet routes are approved, SNAT/forwarding persist, and pos/optiplex accept routes with scoped pod SNAT. Pod TLS reachability passed from both Kubernetes hosts |
-| Tailnet policy | Restricted grants applied and API-validated with 13 embedded tests. Administrator sources, node API/metrics, DNS and callback paths are explicit; allow-all removed. Native Tailscale SSH is not used |
-| Callback isolation | Thor reaches pos:8443 only. Dedicated Traefik routing permits the Panel hostname and `/api/remote/…`; all four node-token requests returned 200, missing credentials 401, unrelated hosts/paths and traversal probes 404. Thor's shared pos:443/:80 and alternate NodePort connections were denied. LAN callback/NodePort probes were blocked. See [callback security](callback-security.md) |
-| Public ingress | All four games answered public TCP and real Mindustry UDP discovery. Public 22/2022/3389/8080/9100 probes were blocked. OCI security lists no longer allow world SSH; Docker forwarding rules enforce selected game ports. Interactive player gameplay is not claimed |
-| Panel | Official pinned rc.2 image deployed in existing k3s, SQLite/file sessions/database queue. Queue worker and supercronic were RUNNING. PVC is Bound on optiplex with PV reclaim Retain; no HA replication is claimed. Four enrolled nodes responded to authenticated Panel management requests |
-| TLS | Panel, four Wings endpoints and callback proxy use the existing homelab PKI. Six Certificates Ready; leaf chain/SAN/key/expiry validated. No extra root CA or CA private-key export. Browser console/WebSocket round trip passed |
-| Wings/games | Docker and pinned native Wings services enabled on all four. Pinned Mindustry v160.7 workloads run with amd64 runtimes on E6 and arm64 on Thor; no emulation. All four hosts rebooted successfully, retaining data markers, paid UUID mounts and restarted services/games |
-| Idempotence | All-four Wings provisioning rerun changed zero resources. DNS rerun changed zero. Callback firewall on both hosts and router proxy rerun changed zero. Panel helper rerun preserved administrator credentials and node tokens |
-| Backups | Selected four-game/Panel capture encrypted, uploaded to private Object Storage, downloaded, hash-checked and decrypted into new directories. Inner checksums, SQLite integrity, APP_KEY and four saved worlds/pinned game binaries verified. Games resumed. Panel-only capture also retested. No complete host-loss recovery or recurring scheduler is claimed |
-| Monitoring/budgets | Existing Prometheus observed four exporters, four active Wings services and four public TCP probes healthy. Small blackbox exporter runs in existing k3s, not another OCI VM. Native EUR actual-spend alerts at 200/225/240 accepted. Alert delivery has not been triggered/tested; alerts are not spending caps |
+Review every replacement, deletion, shape/storage change and public ingress
+change before applying. Retained imports must propose no unintended resource
+changes. If the Windows compatibility prerequisite is unresolved, a full-root
+plan must fail its Windows precondition. Use only an explicitly reviewed,
+approved staged plan for independent non-Windows work; a targeted check is
+not a clean full-environment plan. After applying, generate a fresh plan and
+explain any difference before making another change.
 
-## Approved game pool — October 30
+Build the Panel, Traefik and Argo roots with the authorized KSOPS environment:
 
-The public TCP/UDP pool is 25565–25765 inclusive on each node (201 port
-numbers). Terraform changed exactly two existing NSG rules in place, without
-creating/replacing/deleting resources. Host forwarding uses one conntrack
-range rule per protocol. Panel reserves 201 allocations per node and preserves
-the existing game on 25565, leaving 200 free on each node.
+```bash
+(
+  set -e
+  umask 077
+  validation_dir=$(mktemp -d)
+  trap 'rm -rf -- "$validation_dir"' EXIT
+  kustomize build --enable-alpha-plugins --enable-exec kubernetes/pelican/manifests > "$validation_dir/panel.yaml"
+  kustomize build --enable-alpha-plugins --enable-exec kubernetes/traefik/manifests > "$validation_dir/traefik.yaml"
+  kustomize build --enable-alpha-plugins --enable-exec kubernetes/argocd/manifests > "$validation_dir/argocd.yaml"
+  kubeconform -strict -summary -ignore-missing-schemas "$validation_dir/"*.yaml
+  kubectl apply --server-side --force-conflicts --dry-run=server -f "$validation_dir"
+)
+```
 
-Thirty-two external boundary checks passed with temporary listeners on the
-actual Wings Docker networks: TCP/UDP 25566 and 25765 responded on all four
-nodes; 25564 and 25766 were blocked. The temporary probe containers were
-stopped afterward. Existing game protocol probes, private Wings health and
-public administrative-port denial also passed. New games inside the pool can
-be created through Panel without another network change.
+The temporary files can contain decrypted Secrets; keep them private. The API
+dry run validates custom resources whose schemas Kubeconform does not have.
+Server-side apply avoids the client-side annotation size limit on large CRDs;
+`--force-conflicts` here applies only to the dry run. Run Ansible syntax/
+production lint, ShellCheck, Python compilation and a redacted secret scan for
+changed files before committing.
 
-The first post-apply check was blocked by a transient homelab/DNS outage.
-After connectivity recovered, the targeted game-pool reconciliation returned
-exit 0/no changes, private Wings health passed and Panel HTTPS responded.
-See the [network investigation](../../docs/dns-network-incident-2026-10-30.md)
-for the observed evidence and unresolved physical trigger.
+## DNS and private access
 
-## Code checks
+```bash
+ansible-playbook -i pos, docker/adguardhome/deploy.yaml
+dig @192.168.1.28 github.com
+dig +tcp @192.168.1.28 pelican.home.internal
+dig @100.114.113.82 wings-01.oci.home.internal
+python3 oci/scripts/healthcheck.py
+```
 
-- Terraform fmt and validate pass on the sole `oci/terraform/` root. Backend
-  initialization and pinned provider installation previously passed. Fresh
-  game-rule and final-policy targeted plans reported no changes; these are
-  scoped staged checks, not full-root acceptance.
-- Panel, Argo and Traefik Kustomize/KSOPS builds pass with the authorized age
-  identity kept in memory. Panel build: Kubeconform 12 valid, zero invalid or
-  errors, 10 missing CRD schemas skipped; Argo: 57 valid, zero invalid/errors,
-  four skipped. API server dry runs validate the custom resources too.
-  Argo's large CRD exceeds client-side last-applied annotation limits, so its
-  successful dry run uses server-side apply; no Argo installation was applied.
-- Ansible production-profile lint, relevant syntax checks, Python compilation,
-  ShellCheck and redacted secret scans pass. New Panel directory/error and
-  forced-timeout paths were checked in isolation; real helper rerun passes.
-- Local Windows image/import/lifecycle regression checks previously passed.
-  They do not establish OCI Windows launch/RDP acceptance.
+Each Wings FQDN must return exactly its private VNIC address. Verify fresh
+key-authenticated SSH to all Linux private addresses and sudo where needed.
+Check both approved OCI subnet routes, router forwarding/SNAT, and pod access
+from both Kubernetes hosts. A tailnet peer being online is not a subnet-route
+test. Keep a working recovery path before changing listeners or ingress.
+Use [callback checks](callback-security.md) to confirm Thor can reach only the
+authenticated Panel daemon API on the dedicated listener.
 
-## Windows and remaining approvals
+## Panel, games and storage
 
-The approved state/image stage completed: one sanitized 17,315,330,048-byte
-source upload, SHA256
-`c74d180aefb54a0e02c45bc4a16c2ab2403b6cbb32332675c9882edcf52a7881`, and an
-AVAILABLE Windows/Windows11 image of 81,920 MB. Candidate E4 compatibility and
-UEFI/Secure Boot schema settings were accepted and read back. The original
-MPMB VM is preserved and running; local tests used separate clones.
+```bash
+kubectl -n argocd get application pelican traefik-config
+kubectl -n pelican get pods,pvc,certificates
+kubectl -n pelican exec deployment/pelican -c panel -- supervisorctl status
+python3 oci/scripts/check-games.py
+```
 
-Oracle's [regular Compute image-capability reference](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm)
-excludes custom-image Secure Boot, while its
-[Secure Desktops Windows guide](https://docs.oracle.com/en-us/iaas/secure-desktops/windows-image.htm)
-enables shielded desktop-pool instances. API acceptance is not technical
-confirmation for the exact regular E4/Windows 11/Secure Boot/TPM configuration.
-Keep `windows_compatibility_verified=false`, the 2 OCPU/16 GB/100 GB allocation,
-and the security requirements intact. Do not silently change service or OS.
+Require Synced/Healthy applications, Ready certificates, a Bound retained PVC,
+and running queue/scheduler processes. In Panel, check all four nodes and a
+browser console/WebSocket round trip. Test each game's actual public protocol
+and an external game client where applicable. The supplied game probe checks
+Mindustry TCP/UDP discovery and public-admin port denial; adapt probes for
+other games instead of treating an open TCP socket as gameplay acceptance.
 
-[Oracle SR 4-0004170294](https://support.oracle.com/support/?SR=4-0004170294&page=sptemplate&sptemplate=sr-activities)
-was last verified Operations Working, assigned to Kumar Anurag, with an
-acknowledgement but no technical answer or requested customer action. This
-is a last-observed status, not an assertion of continuous portal monitoring.
-After technical confirmation, prepare and review a Windows launch plan and
-obtain separate approval. Actual OCI boot, TPM/Secure Boot, private RDP and
-start/stop/status tests ending STOPPED remain pending.
+For each node, inspect Docker/Wings service state, native image architecture,
+disk space and the data mount. Paid data must mount by UUID at `/srv/pelican`;
+Thor keeps `/var/lib/pelican/volumes` on its retained root disk. During an
+approved reboot test, reboot one node at a time, router last. Require fresh
+private access, automatic service/game recovery, unchanged data markers and
+correct mounts. Never initialize an existing disk to fix a missing mount.
 
-Current list-price model is €220.67/month for deployed non-Windows scope,
-or €232.88 for the full requested infrastructure, before unmeasured charges;
-see [cost assumptions](costs.md). The promotion expires November 21 at
-23:59:59 UTC. Recheck usage/balance and funding before continuing beyond it.
+Select free allocations from the TCP/UDP 25565–25765 pool when adding games.
+An unassigned allocation need not answer probes. Test a listener or actual
+game at the chosen port; keep administrative services out of the public pool.
 
-No legacy resource deletion is proposed. The exact authorized deletion set
-is empty. Merge remains a separate human decision. Post-merge removal of the
-narrow Argo revision staging exception is described in callback-security.md.
+## Backups and monitoring
+
+Follow [backup capture and restore](operations.md#backups-and-restores).
+Download a named encrypted object, verify stored/local SHA256, decrypt into
+new empty directories, check every member, SQLite integrity, APP_KEY and
+selected saved worlds. Confirm previously running games resume after capture.
+Archive checks alone do not prove complete host-loss recovery.
+
+In the existing Prometheus UI, check private exporter `up`, Wings/systemd
+state, disk/memory/CPU metrics and `probe_success{job="oci-public-games"}`.
+Confirm the private path from both homelab nodes and the public game path.
+Test notification delivery separately from rule installation. Read usage and
+promotion balance with `spend-status.py`, compare with the cost model and
+check promotion expiry; budget notifications do not cap spending.
+
+## Windows acceptance
+
+Before launch, obtain technical confirmation for the exact regular E4 Windows
+11 custom-image/UEFI/Secure Boot/TPM configuration and review the imported
+image's boot minimum. Preserve the approved 2 OCPU/16 GB/100 GB allocation and
+security requirements. Image metadata acceptance or local QEMU tests do not
+establish OCI boot compatibility. Obtain launch approval for the saved plan.
+
+After launch, check actual guest Secure Boot/TPM, private RDP/NLA, a rejected
+wrong-password attempt and the start/stop/status scripts. Recheck Terraform
+for unintended lifecycle changes, verify persistent boot storage, and leave
+the VM stopped after testing. Diagnose failure using private access or console
+recovery; never open public RDP or disable security requirements as a shortcut.

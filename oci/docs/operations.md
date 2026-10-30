@@ -1,12 +1,12 @@
 # Operations and recovery
 
-These are procedures to run after prerequisites/approval; they are not evidence of deployment. Use the same root, OCI profile/region and private DNS for all operations.
+Use the same Terraform root, OCI profile/region and private DNS for all operations. Obtain the applicable approval before billable or destructive actions.
 
 ## Private administration and DNS
 
-Thor's key is available through Bitwarden; run `python3 oci/scripts/select-ssh-agent-key.py`. Bootstrap with explicit `IdentityAgent` and the selected public key at `ubuntu@100.89.233.80`. The private key stays in Bitwarden. Thor currently binds SSH only on that tailnet IP. Use the reviewed `bootstrap-router.yaml` to add 10.10.50.10 alongside it; use `ssh ubuntu@10.10.50.10` only after listener and route verification. Other Linux private IPs and Windows IP come from `terraform output`. Administrators accept the approved OCI routes (`tailscale set --accept-routes=true` on Linux). Only the router runs Tailscale; Wings peers and Windows do not.
+Thor's key is available through Bitwarden; run `python3 oci/scripts/select-ssh-agent-key.py`. Bootstrap with explicit `IdentityAgent` and the selected public key at `ubuntu@100.89.233.80`. The private key stays in Bitwarden. Thor uses both private and tailnet SSH listeners. During a rebuild, use `bootstrap-router.yaml` over the existing tailnet path to restore the private listener before switching administration to 10.10.50.10. Other Linux private IPs and Windows IP come from `terraform output`. Administrators accept the approved OCI routes (`tailscale set --accept-routes=true` on Linux). Only the router runs Tailscale; Wings peers and Windows do not.
 
-The proposed actual policy is `ansible/tailscale/policy.hujson`, using Tailscale's current grants syntax. The user reports the existing policy is allow-all and requested a restrictive replacement. The file uses observed IPv4 identities with no placeholders or catch-all grant:
+The policy source is `ansible/tailscale/policy.hujson`. Maintain the following scoped grants and their embedded acceptance/denial tests:
 
 | Source | Destination | Permitted traffic |
 |---|---|---|
@@ -20,7 +20,7 @@ The proposed actual policy is `ansible/tailscale/policy.hujson`, using Tailscale
 | Thor/router tag | pos tailnet address | TCP/8443, authenticated Panel daemon API only |
 | Other tailnet devices | Infrastructure | No grant; default denied |
 
-`azoz-laptop` (100.66.202.74) and `freyr` (100.82.125.5) are the proposed trusted admin clients. The verified tailnet owner account can assign `tag:oci-router`, but owning a device does not automatically grant it network administration access. Other members' devices, the owner's phone and the old home-router device are denied administrative/application access unless a later explicit rule is reviewed. Tailnet members retain TCP/UDP 53 to pos for the existing `home.internal` split-DNS resolver; pos redirects that traffic to AdGuard on 5353. This DNS-only exception does not grant server administration. Align the router's `router_tailnet_admin_sources` with these two admin IPs. Review this trust choice before applying.
+`azoz-laptop` (100.66.202.74) and `freyr` (100.82.125.5) are the trusted admin clients. The verified tailnet owner account can assign `tag:oci-router`, but owning a device does not automatically grant it network administration access. Other members' devices, the owner's phone and the old home-router device are denied administrative/application access unless a later explicit rule is reviewed. Tailnet members retain TCP/UDP 53 to pos for the existing `home.internal` split-DNS resolver; pos redirects that traffic to AdGuard on 5353. This DNS-only exception does not grant server administration. Align the router's `router_tailnet_admin_sources` with these two admin IPs. Review this trust choice before applying.
 
 This is an IPv4 management policy; native IPv6 and ICMP are not granted. Use the documented IPv4 private/tailnet addresses for connection checks; routing health probes use TCP rather than ping. Known homelab LAN /32 rules only authorize traffic: they do not create a home subnet route or revive the offline home router. Public game clients use public OCI game addresses and are outside these tailnet grants. Kubernetes node-to-node LAN/CNI traffic is not altered by a tailnet policy.
 
@@ -84,8 +84,6 @@ Retention target: 14 daily selected backups, with a weekly size check to stay ne
 
 Restore into a **new empty staging directory**: download the named object with `oci os object get`; compare its SHA256 to both the local record and `opc-meta-sha256` from `oci os object head`; age-decrypt and extract the outer archive; verify every member against `manifest.json`. Extract `panel.tar.gz` into another fresh directory, run SQLite `PRAGMA integrity_check`, and recover the effective APP_KEY with that database and application storage. Extract each selected game archive separately and check saved worlds/binaries. For an actual recovery, stop the affected server/Panel first, review destination ownership and only then restore files and the Secret together. Never overwrite live data merely to test recovery.
 
-The deployed acceptance backup was uploaded, downloaded and restored into disposable directories: encrypted hash and inner checksums matched, SQLite integrity was `ok`, APP_KEY matched, and all four saved Mindustry worlds plus pinned binaries verified. Games resumed after capture. This tests archive recovery, not a complete Kubernetes-host-loss recovery or a full boot-volume restore. Generated run reports remain private under `oci/inventory/reports/`.
-
 Paid game data survives reboot through an ext4 UUID mount. Wings RequiresMountsFor prevents accidental use of an unmounted boot directory. Compute/volume prevent_destroy guards against accidental Terraform destruction; preservation imports do not relocate existing Thor data. Rebuilding a paid node requires a reviewed instance-only replacement while preserving data/boot disks, then reattachment and UUID remount; do not remove protection or recreate disks blindly. Reuse discovered filesystems and never format an existing disk. Full disaster recreation requires network import/state recovery first and a confirmed Windows image workflow; imported freeze rules must be reconciled before claiming a complete greenfield recreation.
 
 ## Windows lifecycle
@@ -142,7 +140,7 @@ Test a separate copy of the final capture with fresh Secure Boot NVRAM and TPM 2
 After an explicitly approved image import, `OCI_APPROVE_IMAGE_IMPORT=yes oci/windows/configure-image.sh "$IMAGE_OCID"` applies the [Windows 11-specific OCI image settings](https://docs.oracle.com/en-us/iaas/secure-desktops/windows-image.htm) and E4 compatibility entry. It requires `OCI_APPROVE_IMAGE_IMPORT=yes`, rejects another OS or an image larger than 100 GiB, and preserves other capability overrides. Review its output before setting the Terraform compatibility gate. Live image import and candidate capability API checks now pass; see oci/inventory/reports/windows-oci-import.json. Regular Compute support and actual secure E4 boot remain unverified. Keep the compatibility gate false until the documented support constraint in validation.md is resolved. Secure Boot, measured boot and TPM stay enabled in Terraform. Do not replace these checks with registry bypasses.
 
 
-Terraform policy validation passed against the authenticated tailnet with all 13 test cases. An isolated diagnostic plan proposes importing the current policy and one update, with no adds/destroys or OCI changes. A deliberately forbidden `pos:2375` acceptance test was rejected by the API, confirming failed tests block planning; the valid candidate was restored. See `oci/inventory/reports/tailscale-plan-summary.json`. The restrictive live policy now uses the dedicated callback port and denies Thor shared HTTPS access. Native Tailscale SSH is disabled on pos, optiplex and Thor; private OpenSSH keys remain the administration path. If optiplex LAN SSH is unavailable, use its existing SSH alias with `-o HostName=100.77.7.115` to retain the configured identity.
+Validate the complete tailnet policy against the API before applying it, including all 13 embedded cases and the denied administration paths. Keep native Tailscale SSH disabled when using these OpenSSH grants. For optiplex recovery over the tailnet, retain its configured identity with `ssh -o HostName=100.77.7.115 optiplex`.
 
 The homelab inventory retains the existing `pos`/`optiplex` SSH aliases so their configured keys are used. Optiplex has a tailnet HostName override because its recorded LAN SSH address was unreachable during discovery. This Ansible project disables SSH multiplexing: the pos check failed with a reused connection and succeeded with ordinary SSH. Both homelab `hostname` checks passed without guest changes. Reconcile an existing private inventory with these connection settings before provisioning.
 
@@ -153,4 +151,4 @@ routes only `pelican.home.internal/api/remote/…`; Panel continues validating
 node tokens. Shared pos:443, UI/admin paths, other hostnames and the alternate
 NodePort are unavailable to Thor. See [callback security](callback-security.md)
 for the source/destination matrix, persistent host firewall, staging/recovery
-sequence and live verification evidence (local report: `oci/inventory/reports/callback-isolation-evidence.json`).
+sequence and access-check procedure.

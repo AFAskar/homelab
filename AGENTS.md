@@ -50,3 +50,12 @@ For the OCI environment, Windows licensing is handled by the user and excluded
 from infrastructure cost, feasibility and deployment analysis. Do not add
 licensing costs or licensing approval gates. Keep technical image, firmware,
 TPM, Secure Boot and access checks in scope.
+
+# Documentation
+
+- Write documentation as actionable setup, configuration, operations, checks
+  and recovery instructions. Keep required inventory facts and dated pricing
+  sources where they help operate the environment.
+- Put implementation summaries, review discussion, test pass/fail reports and
+  incident timelines in PR descriptions/comments, not operator documentation.
+- Keep generated evidence, state, plans and raw run logs ignored and private.
