@@ -20,6 +20,7 @@ root = Path(__file__).resolve().parents[2]
 private = root / 'oci/ansible/secrets'
 os.umask(0o077)
 private.mkdir(parents=True, exist_ok=True)
+(root / 'oci/inventory').mkdir(parents=True, exist_ok=True)
 
 
 def panel(code, data):
