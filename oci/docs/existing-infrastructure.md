@@ -76,3 +76,20 @@ Read-only SSH inspection through localhost:2222 confirmed **Windows 11 Pro, buil
 A retained clean offline checkpoint `candidate-p3-4g-1793001620` was used instead of copying the live disk. `windows/clone-checkpoint.py` verified its recorded SHA256, cloned its standalone disk using a local Btrfs reflink, and ran `qemu-img check` successfully. The local candidate is at ignored `oci/windows/work/mpmb-source.qcow2`, virtual capacity **85,899,345,920 bytes (80 GiB)**, with an ignored provenance report alongside it. No source VM stop, snapshot, restore, sysprep, live-disk copy or OCI upload was performed. This is an **unprepared local source clone**, not a generalized or OCI-booted image. Before export, sanitize only the disposable clone: remove MPMB private/paid fixtures and unrelated user data/access, remove unneeded installer overrides, verify signed drivers and guest security, provision new credentials, generalize, and cleanly shut down. Never sanitize/generalize the reference VM itself.
 
 Oracle's [Windows import guide](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/importingcustomimagewindows.htm) states a 256 GB minimum and BIOS/MBR preparation, but the linked [boot-volume guide](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/bootvolumes.htm#Custom) says current Linux/Windows custom volumes use the image default or 50 GB (whichever is higher), with 256 GB specifically for older Windows platform images / Server 2012 R2. These sources conflict. The earlier claim that 200 GB is definitely blocked was too strong: no OCI image import or launch has tested it. Keep the requested 100 GB; the local source is only 80 GiB, and the actual imported-image minimum/firmware capabilities must be verified after an approved import. No increase is requested solely on the older import-guide wording. The custom-image TPM restriction remains an independent unresolved issue.
+
+## Non-Windows deployment update — October 30
+
+Twelve retained OCI resources were authoritatively imported without additions,
+updates or deletions in the import apply. Thor remains the actual A1 4/24/100
+instance, logical wings-04, with its root data and tailnet SSH preserved.
+The retained shared network was reused. After private route verification,
+its two security lists replaced broad SSH access with the router private /32.
+Wings/callback NSGs were attached additively to Thor's VNIC.
+
+Three exact E6 nodes, their three 200 GB data volumes, game/private NSGs, the
+private backup bucket and budget alerts are deployed and state-managed.
+Object/state/image storage created in the approved bootstrap is retained.
+The current identities and addresses come from Terraform outputs; generated
+inventory/reports remain local. Windows has an imported image but no instance.
+The exact cleanup/deletion set remains **empty**; no shared network, Thor
+storage, old access dependency or other resource was deleted.

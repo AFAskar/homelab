@@ -1,5 +1,16 @@
 # Preservation and deployment sequence
 
+The approved non-Windows migration is complete: retained imports, private
+router/access migration, paid Linux, Panel enrollment and native games are
+live. Callback access is further restricted as documented in
+[callback security](callback-security.md). The steps below retain the
+bootstrap/recreation procedure and historical plan checkpoints; they do not
+mean those stages are still awaiting approval. See [current validation](validation.md)
+for verified outcomes and remaining Windows tests. No cleanup or merge is
+authorized. Full-root planning remains blocked by the Windows compatibility
+precondition; staged non-Windows reconciliation has no changes.
+
+
 **Only the user-approved €5 state/image stage is in progress.** Private state and image buckets were created, and the real root initialized against remote state. No compute, ACL/access migration, retained-resource import, cleanup or merge has been executed. Full deployment awaits imported-image capability checks, Thor private routing and the separately approved full launch plan. Read the validation report before using these steps.
 
 ## First approval stage: state and image preparation

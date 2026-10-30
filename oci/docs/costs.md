@@ -40,7 +40,7 @@ General free block storage allowance is 200 GB shared across boot and block disk
 ## Additional infrastructure costs
 
 - Backup bucket: modelled at 50 GB average; no automatic paid snapshots. Retention has no automatic deletion, so unbounded backups will increase costs. Operator reviews a 14-day rolling set, excludes unselected game data, and requests approval before deletion.
-- Custom Windows image and uploaded import source **both incur storage**. They are not part of the 850 GB instance disks. At an illustrative 80 GB each (the source virtual capacity), together add $4.08 / €3.79 per full month, raising baseline to **$251.84 / €234.21**. The finalized sanitized/generalized local capture is 80 GiB virtual and 17.315 GB compressed QCOW2. No OCI custom image exists yet. Rounding conservatively to **86 decimal GB custom image + 18 GB source upload**, the full-month infrastructure estimate is **€232.88** / $250.4120 USD list, leaving **€17.12** from €250, before unmeasured state/API/egress/taxes. See measured-image estimate (local report: `oci/inventory/reports/cost-estimate-with-image.json`). Actual imported-image billing size must be read after the approved import; the virtual size is used conservatively until then. Temporary download media stays local. Pass measured sizes with `--image-gb` and `--upload-gb`.
+- Custom Windows image and uploaded import source **both incur storage**. They are not part of the 850 GB instance disks. At an illustrative 80 GB each (the source virtual capacity), together add $4.08 / €3.79 per full month, raising baseline to **$251.84 / €234.21**. The finalized sanitized/generalized local capture is 80 GiB virtual and 17.315 GB compressed QCOW2. The approved import is AVAILABLE with 81,920 MB metadata; no Windows instance exists. Rounding conservatively to **86 decimal GB custom image + 18 GB source upload**, the full-month infrastructure estimate is **€232.88** / $250.4120 USD list, leaving **€17.12** from €250, before unmeasured state/API/egress/taxes. See measured-image estimate (local report: `oci/inventory/reports/cost-estimate-with-image.json`). The estimate conservatively rounds the imported 80 GiB image to 86 decimal GB and the compressed source upload to 18 GB; billing-reported stored usage can differ. Temporary download media stays local. Pass measured sizes with `--image-gb` and `--upload-gb`.
 - A 31-day month (744 continuous hours) adds $3.864 / €3.59 to paid compute. Recalculate with `--hours 744`. Actual Windows hours are independent of that assumption.
 - Existing IGW, NAT and service gateway are reused; no additional router VM, load balancer or paid monitoring host is added. No separate gateway processing fee is modelled; ordinary transfer charges still apply.
 - OCI network API tier for Middle East/Africa SKU B93456: first 10240 GB/month outbound is zero, then $0.05/GB. This is shared tenancy use, not 10 TB per VM. Excess 1 TB is $51.20 / €47.62. Regional/cross-region transfer, replication, internet game traffic, backups and existing workloads must be measured. Avoid cross-region state/backups.
@@ -63,3 +63,22 @@ The Windows import guide's 256 GB statement conflicts with the [current boot-vol
 On 2026-10-28 the user authorized reducing only the proposed Windows boot disk from 200 GB to **100 GB** if worthwhile. At the selected 10 VPU tier, this saves **$4.25 / €3.95 per month**, including stopped hours (€47.43/year at the native EUR tariff). It halves Windows boot-storage cost from $8.50 to $4.25/month and reduces paid instance storage from 950 to **850 GB**. The existing 80 GiB source fits in the proposed 100 GB virtual capacity without shrinking its filesystem; actual OCI imported-image minimum and boot compatibility remain unverified. No existing local or OCI disk has been resized.
 
 The supplied Console details established €250 total commitment. Subsequent authenticated subscription discovery established the separate unused promotion, actual expiry and A1 tiers; no further screenshot or billing credential is currently required from the user.
+
+## Deployed non-Windows scope
+
+The non-Windows stage was approved and deployed October 29. Its modelled
+full 730-hour cost is **€220.67/month** including conservative image/source
+storage and 50 GB selected backups, excluding Windows compute/boot storage
+and unmeasured requests/egress/taxes. Three E6 instances and 750 GB paid
+instance storage are live; Thor's existing 100 GB is separate. The actual
+acceptance backup is about 75.6 MB encrypted; the model retains the larger
+50 GB operating assumption. No additional paid router/monitoring VM was added.
+
+The October 29 official catalog refresh retained the native EUR rates above;
+ECB October 29 was €1 = $1.1130 (USD-list comparison only). Full infrastructure
+including the unlaunched Windows VM remains €232.88/month. The earlier zero
+usage/€250 available subscription read is a dated snapshot; billing lag means
+it is not the current remaining credit after deployment. Re-read usage and
+subscription balance with `spend-status.py` before another spending decision.
+The November 21 expiry can end credit availability before arithmetic
+exhaustion; no automatic shutdown or hard budget enforcement is installed.
