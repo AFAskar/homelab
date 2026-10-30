@@ -103,8 +103,10 @@ for name, instance in sorted(nodes.items()):
         '$n=App\\Models\\Node::firstOrCreate(["name"=>$data["node"]["name"]],$data["node"]); '
         'foreach(["fqdn","scheme","daemon_base"] as $k){ '
         'if($n->$k!==$data["node"][$k]) throw new RuntimeException("Existing node differs: ".$k); } '
-        'App\\Models\\Allocation::firstOrCreate(["node_id"=>$n->id,"ip"=>$data["ip"],"port"=>25565],'
-        '["ip_alias"=>$data["public_ip"]]); echo $n->getJsonConfiguration();',
+        # Approved inclusive pool: 201 allocations per node, including existing 25565.
+        'foreach(range(25565,25765) as $port){ '
+        'App\\Models\\Allocation::firstOrCreate(["node_id"=>$n->id,"ip"=>$data["ip"],"port"=>$port],'
+        '["ip_alias"=>$data["public_ip"]]); } echo $n->getJsonConfiguration();',
         {'node': desired, 'ip': instance['private_ip'], 'public_ip': instance['public_ip']})
     config['api']['ssl'].update({'cert': '/etc/pelican/tls/tls.crt', 'key': '/etc/pelican/tls/tls.key'})
     directory = private / name

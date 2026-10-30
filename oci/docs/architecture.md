@@ -7,7 +7,7 @@ flowchart LR
   K3S --> Panel[Traefik + homelab CA TLS\nPelican Panel + SQLite PVC]
   Router -->|SNAT source 10.10.50.10| Wings[10.10.50.0/24\nwings-01..03 E6 + wings-04 A1]
   Router -->|SNAT, private RDP| Win[10.10.10.0/24\nwin11-lab E4 / normally stopped]
-  Players[Internet game clients] -->|IGW / public IPv4 / TCP+UDP 25565| Wings
+  Players[Internet game clients] -->|IGW / public IPv4 / TCP+UDP 25565–25765| Wings
   Wings -->|TLS callback proxy on router private :443| Router
   Router -->|Verified TLS / isolated callback listener :8443| Panel
   Wings --> Backups[Private OCI Object Storage\nselected consistent archives]
@@ -35,7 +35,7 @@ Wings on non-router nodes needs callbacks to Panel but has no Tailscale client. 
 
 Panel: `https://pelican.home.internal`, ingress TLS from existing `homelab-ca`. Wings: `wings-01.oci.home.internal` through `wings-04.oci.home.internal`, HTTPS 8080 with per-node SAN certificates from the same CA. Browsers use those private FQDNs for websocket console/file features, so administrators need approved routes, DNS and CA trust too. Panel's image gets a combined CA bundle, with a ConfigMap generated directly from `pki/homelab-root-ca.crt` through the shared `pki/` Kustomize base. There is one CA certificate source; no copied certificate to maintain.
 
-API, SSH, SFTP (2022) and node-exporter (9100) are private. No public Wings API is needed in this topology. Only TCP/UDP 25565 is allocated publicly initially, independently on every node. Configure allocations using each node's actual private bind IP; OCI public IPv4 NAT forwards to it. Additional games need explicit matching Panel allocations, Terraform TCP/UDP rules and Ansible firewall ports. Docker forwarding is filtered in DOCKER-USER; UFW alone would not cover published game ports. IPv6 administration is blocked by host rules and no public IPv6 ingress is provisioned.
+API, SSH, SFTP (2022) and node-exporter (9100) are private. No public Wings API is needed in this topology. The approved TCP/UDP 25565–25765 pool is available independently on every node (201 port numbers inclusive); each game takes free Panel allocations within that pool. Configure allocations using each node's actual private bind IP; OCI public IPv4 NAT forwards to it. Additional games inside the pool need free Panel allocations and their matching game configuration; ports outside the pool still need explicit Terraform and Ansible changes. Docker forwarding is filtered in DOCKER-USER; UFW alone would not cover published game ports. IPv6 administration is blocked by host rules and no public IPv6 ingress is provisioned.
 
 ## Panel release and persistence
 

@@ -6,6 +6,8 @@ One Terraform root lives in `oci/terraform/`. It preserves Thor as logical `wing
 
 Generated inventory, billing/pricing snapshots, cost estimates and validation reports stay in ignored `oci/inventory/reports/`, with private permissions. They are local run artifacts, not source configuration. Keep dated findings and their limits in Markdown; rerun discovery/planning/checks before deployment instead of trusting an old report. Checked-in JSON is reserved for declarative inputs such as image capabilities and game eggs.
 
+The public game pool is **25565–25765 inclusive, TCP and UDP**, on each Wings node. This is 201 port numbers per node. Select free allocations in Panel when creating a game; network changes are needed only outside that pool. Administrative services remain private. See [game operations](docs/operations.md).
+
 ## Tooling and authentication
 
 Use Terraform 1.12+ (OCI backend locking), OCI provider 9.11.0 and Tailscale provider 0.29.3 (lockfile committed), OCI CLI, Python 3 with `oci` and `PyYAML`, Ansible with the pinned collections, kubectl, Kustomize/KSOPS 4.5.1, SOPS and age. `oci setup config` configures the default API-key profile; keep `~/.oci` and its private key readable only by you. The profile needs read access to identity, compute, networks, volumes, images, limits, budgets, usage and storage. Deployment additionally needs their create/update rights in Ymir. API tests do not prove all write permissions. Do not commit keys, raw discovery, plans, state, tfvars, images or Wings tokens.

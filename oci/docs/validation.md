@@ -30,6 +30,28 @@ No secrets, raw state, images or decrypted manifest builds belong in Git.
 | Backups | Selected four-game/Panel capture encrypted, uploaded to private Object Storage, downloaded, hash-checked and decrypted into new directories. Inner checksums, SQLite integrity, APP_KEY and four saved worlds/pinned game binaries verified. Games resumed. Panel-only capture also retested. No complete host-loss recovery or recurring scheduler is claimed |
 | Monitoring/budgets | Existing Prometheus observed four exporters, four active Wings services and four public TCP probes healthy. Small blackbox exporter runs in existing k3s, not another OCI VM. Native EUR actual-spend alerts at 200/225/240 accepted. Alert delivery has not been triggered/tested; alerts are not spending caps |
 
+## Approved game pool — October 30
+
+The public TCP/UDP pool is 25565–25765 inclusive on each node (201 port
+numbers). Terraform changed exactly two existing NSG rules in place, without
+creating/replacing/deleting resources. Host forwarding uses one conntrack
+range rule per protocol. Panel reserves 201 allocations per node and preserves
+the existing game on 25565, leaving 200 free on each node.
+
+Thirty-two external boundary checks passed with temporary listeners on the
+actual Wings Docker networks: TCP/UDP 25566 and 25765 responded on all four
+nodes; 25564 and 25766 were blocked. The temporary probe containers were
+stopped afterward. Existing game protocol probes, private Wings health and
+public administrative-port denial also passed. New games inside the pool can
+be created through Panel without another network change.
+
+The final post-apply targeted reconciliation was attempted but could not read
+the state backend: local DNS on pos became unreachable, and both homelab
+nodes showed offline in Tailscale. The apply completed before this outage;
+the external boundary/game probes and allocation checks passed. A clean
+post-pool plan and current Panel availability are not claimed until homelab
+connectivity returns.
+
 ## Code checks
 
 - Terraform fmt and validate pass on the sole `oci/terraform/` root. Backend

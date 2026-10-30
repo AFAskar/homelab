@@ -8,8 +8,9 @@ retained_data_reviewed: false
 wings_data_device: /dev/oracleoci/oraclevdb
 wings_data_mount: /srv/pelican
 wings_public_interface: REPLACE_DISCOVERED_INTERFACE
-wings_game_tcp_ports: [25565]
-wings_game_udp_ports: [25565]
+# Conntrack accepts first:last ranges, keeping one rule per protocol.
+wings_game_tcp_ports: ["25565:25765"]
+wings_game_udp_ports: ["25565:25765"]
 private_access_verified: false
 # Deliberately false: installing firewall lockdown before route verification
 # would destroy the last working access path.
