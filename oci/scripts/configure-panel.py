@@ -23,13 +23,21 @@ private.mkdir(parents=True, exist_ok=True)
 (root / 'oci/inventory').mkdir(parents=True, exist_ok=True)
 
 
+def run(command, *, timeout=120, **kwargs):
+    try:
+        return subprocess.run(command, timeout=timeout, **kwargs)
+    except subprocess.TimeoutExpired:
+        raise SystemExit(f'{command[0]} timed out after {timeout} seconds. '
+                         'The remote operation may still be running; inspect it before retrying.') from None
+
+
 def panel(code, data):
     bootstrap = ("require 'vendor/autoload.php'; $app=require 'bootstrap/app.php'; "
                  "$app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap(); "
                  "$data=json_decode(stream_get_contents(STDIN),true,512,JSON_THROW_ON_ERROR); ")
-    result = subprocess.run(['kubectl', '-n', 'pelican', 'exec', '-i', 'deployment/pelican',
+    result = run(['kubectl', '-n', 'pelican', 'exec', '-i', 'deployment/pelican',
                              '-c', 'panel', '--', 'php', '-r', bootstrap + code],
-                            input=json.dumps(data), text=True, capture_output=True)
+                            input=json.dumps(data), text=True, capture_output=True, timeout=300)
     if result.returncode:
         log = root / 'oci/inventory/panel-configure-error.log'
         log.write_text(result.stdout + result.stderr)
@@ -44,8 +52,8 @@ if args.initialize:
           'throw new RuntimeException("Unexpected database configuration"); '
           'if(!is_dir(dirname($p))) mkdir(dirname($p),0770,true); '
           'if(!file_exists($p)){ $f=fopen($p,"x"); fclose($f); } echo "true";', {})
-    result = subprocess.run(['kubectl', '-n', 'pelican', 'exec', 'deployment/pelican', '-c', 'panel',
-                             '--', 'php', 'artisan', 'migrate', '--seed', '--force'], capture_output=True)
+    result = run(['kubectl', '-n', 'pelican', 'exec', 'deployment/pelican', '-c', 'panel',
+                             '--', 'php', 'artisan', 'migrate', '--seed', '--force'], capture_output=True, timeout=900)
     log = root / 'oci/inventory/panel-migrations.log'
     log.write_bytes(result.stdout + result.stderr)
     log.chmod(0o600)
@@ -76,8 +84,9 @@ else:
           'echo json_encode(["id"=>$u->id]);', admin)
     print('Administrator created; credential saved only in ignored panel-admin.json (0600).')
 
-nodes = json.loads(subprocess.check_output(
-    ['terraform', '-chdir=' + str(root / 'oci/terraform'), 'output', '-json', 'wings_instances']))
+nodes = json.loads(run(
+    ['terraform', '-chdir=' + str(root / 'oci/terraform'), 'output', '-json', 'wings_instances'],
+    capture_output=True, check=True).stdout)
 if set(nodes) != {f'wings-{n:02}' for n in range(1, 5)}:
     raise SystemExit('Expected exactly four Terraform-managed Wings identities.')
 for name, instance in sorted(nodes.items()):
