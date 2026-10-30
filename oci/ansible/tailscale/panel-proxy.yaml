@@ -47,7 +47,7 @@
           https://pelican.home.internal {
             bind {{ router_private_ip }}
             tls /etc/caddy/pki/panel.crt /etc/caddy/pki/panel.key
-            reverse_proxy https://100.114.113.82:443 {
+            reverse_proxy https://100.114.113.82:8443 {
               header_up Host pelican.home.internal
               transport http {
                 tls_server_name pelican.home.internal

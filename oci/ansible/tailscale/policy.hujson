@@ -149,7 +149,7 @@
         "pos"
       ],
       "ip": [
-        "tcp:443"
+        "tcp:8443"
       ]
     },
     {
@@ -236,27 +236,35 @@
       "src": "thor",
       "proto": "tcp",
       "accept": [
-        "pos:443"
+        "pos:8443"
       ],
       "deny": [
         "pos:22",
         "pos:6443",
         "optiplex:443",
         "admin-laptop:22",
-        "10.10.10.20:3389"
+        "10.10.10.20:3389",
+        "pos:443",
+        "pos:80",
+        "optiplex:8443",
+        "pos:32443"
       ]
     },
     {
       "src": "tag:oci-router",
       "proto": "tcp",
       "accept": [
-        "pos:443"
+        "pos:8443"
       ],
       "deny": [
         "pos:22",
         "optiplex:443",
         "admin-laptop:22",
-        "10.10.10.20:3389"
+        "10.10.10.20:3389",
+        "pos:443",
+        "pos:80",
+        "optiplex:8443",
+        "pos:32443"
       ]
     },
     {

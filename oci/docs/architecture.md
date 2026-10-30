@@ -9,7 +9,7 @@ flowchart LR
   Router -->|SNAT, private RDP| Win[10.10.10.0/24\nwin11-lab E4 / normally stopped]
   Players[Internet game clients] -->|IGW / public IPv4 / TCP 25565| Wings
   Wings -->|TLS callback proxy on router private :443| Router
-  Router -->|Verified TLS / existing pos tailnet IP :443| Panel
+  Router -->|Verified TLS / isolated callback listener :8443| Panel
   Wings --> Backups[Private OCI Object Storage\nselected consistent archives]
 ```
 
@@ -29,7 +29,7 @@ The router's own private address is reached over its Tailscale interface before 
 
 `homelab-routes.yaml` explicitly enables route acceptance on both Kubernetes hosts and persists pod-source SNAT for **only OCI destination subnets**, so pod egress has a tailnet identity that can receive a grant. Test from a pod scheduled on each host; node-level ping is insufficient. The actual `ansible/tailscale/policy.hujson` must replace allow-all network rules and pass its embedded Tailscale tests; no OAuth/auth keys go to Terraform or Git.
 
-Wings on non-router nodes needs callbacks to Panel but has no Tailscale client. A private TLS Caddy proxy on the existing router forwards `pelican.home.internal` to `100.114.113.82:443`, with the Panel Host header, SNI and trusted homelab CA. OCI guests resolve that name to the router private IP; homelab resolves it to Traefik. This avoids reliance on the offline home subnet advertiser or public Panel exposure. The callback proxy is single-host dependent on Thor/pos; recovery instructions cover that limitation.
+Wings on non-router nodes needs callbacks to Panel but has no Tailscale client. A private TLS Caddy proxy on the existing router forwards `pelican.home.internal` to `100.114.113.82:8443`, with the Panel Host header, SNI and trusted homelab CA. OCI guests resolve that name to the router private IP; homelab resolves it to Traefik. This avoids reliance on the offline home subnet advertiser or public Panel exposure. The homelab listener routes only the Panel hostname and `/api/remote/…`; other sites/UI/admin APIs do not appear there. Persistent pre-DNAT filtering admits only Thor over Tailscale, and the final grant denies Thor shared pos:443. See [callback isolation](callback-security.md) for deployment evidence and staging/recovery. The callback proxy is single-host dependent on Thor/pos; recovery instructions cover that limitation.
 
 ## TLS, browsers and game ports
 

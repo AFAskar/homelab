@@ -1,0 +1,135 @@
+{
+  "recorded_utc": "2026-10-30T09:30:53.052178+00:00",
+  "authenticated_node_callbacks": [
+    {
+      "node": "wings-01",
+      "status": 200,
+      "valid_json": true
+    },
+    {
+      "node": "wings-02",
+      "status": 200,
+      "valid_json": true
+    },
+    {
+      "node": "wings-03",
+      "status": 200,
+      "valid_json": true
+    },
+    {
+      "node": "wings-04",
+      "status": 200,
+      "valid_json": true
+    }
+  ],
+  "thor_denied_destinations": [
+    {
+      "destination": [
+        "100.114.113.82",
+        443
+      ],
+      "blocked": true
+    },
+    {
+      "destination": [
+        "100.114.113.82",
+        80
+      ],
+      "blocked": true
+    },
+    {
+      "destination": [
+        "100.114.113.82",
+        32443
+      ],
+      "blocked": true
+    },
+    {
+      "destination": [
+        "100.77.7.115",
+        8443
+      ],
+      "blocked": true
+    }
+  ],
+  "lan_denied_callback_ports": [
+    {
+      "destination": [
+        "192.168.1.28",
+        8443
+      ],
+      "blocked": true
+    },
+    {
+      "destination": [
+        "192.168.1.28",
+        32443
+      ],
+      "blocked": true
+    },
+    {
+      "destination": [
+        "192.168.1.27",
+        8443
+      ],
+      "blocked": true
+    },
+    {
+      "destination": [
+        "192.168.1.27",
+        32443
+      ],
+      "blocked": true
+    }
+  ],
+  "listener_http_checks": [
+    {
+      "host": "pelican.home.internal",
+      "path": "/api/remote/servers",
+      "authenticated": false,
+      "status": 401
+    },
+    {
+      "host": "pelican.home.internal",
+      "path": "/api/remote/servers",
+      "authenticated": true,
+      "status": 200
+    },
+    {
+      "host": "pelican.home.internal",
+      "path": "/",
+      "authenticated": false,
+      "status": 404
+    },
+    {
+      "host": "pelican.home.internal",
+      "path": "/admin",
+      "authenticated": false,
+      "status": 404
+    },
+    {
+      "host": "pelican.home.internal",
+      "path": "/api/client",
+      "authenticated": false,
+      "status": 404
+    },
+    {
+      "host": "pelican.home.internal",
+      "path": "/api/application",
+      "authenticated": false,
+      "status": 404
+    },
+    {
+      "host": "pelican.home.internal",
+      "path": "/api/remote-other/servers",
+      "authenticated": false,
+      "status": 404
+    },
+    {
+      "host": "argocd.home.internal",
+      "path": "/api/remote/servers",
+      "authenticated": false,
+      "status": 404
+    }
+  ]
+}
