@@ -45,12 +45,11 @@ stopped afterward. Existing game protocol probes, private Wings health and
 public administrative-port denial also passed. New games inside the pool can
 be created through Panel without another network change.
 
-The final post-apply targeted reconciliation was attempted but could not read
-the state backend: local DNS on pos became unreachable, and both homelab
-nodes showed offline in Tailscale. The apply completed before this outage;
-the external boundary/game probes and allocation checks passed. A clean
-post-pool plan and current Panel availability are not claimed until homelab
-connectivity returns.
+The first post-apply check was blocked by a transient homelab/DNS outage.
+After connectivity recovered, the targeted game-pool reconciliation returned
+exit 0/no changes, private Wings health passed and Panel HTTPS responded.
+See the [network investigation](../../docs/dns-network-incident-2026-10-30.md)
+for the observed evidence and unresolved physical trigger.
 
 ## Code checks
 
