@@ -1,95 +1,116 @@
-# AdGuard Home as code
+# AdGuard Home
 
-The container already used `docker/adguardhome.yaml`. Its host-only settings,
-firewall redirects and boot prerequisites were previously manual. The complete
-service now reconciles through `docker/adguardhome/deploy.yaml`, preserving
-its existing rootless Podman/pasta deployment and persistent data paths.
+AdGuard runs on pos as the rootless systemd user service `adguardhome.service`.
+Ansible installs its Quadlet, encrypted configuration, persistent directories
+and DNS firewall rules.
 
-## Sources and deployment
+## Deploy
 
-- `docker/adguardhome.yaml`: pinned image, restart policy, address-bound ports
-  and existing work/config mounts. Address defaults remove manual exports.
-- `docker/adguardhome/AdGuardHome.secret.sops.yaml`: authoritative complete
-  configuration encrypted with the existing repository age recipient,
-  including the existing account/password hash, upstreams, filters and rules.
-- `kubernetes/pelican/manifests/wings-endpoints.yaml`: desired Wings private
-  addresses, also consumed by monitoring. Deployment derives exact DNS rules
-  from these endpoints, avoiding another copy of changing OCI addresses.
-- `docker/adguardhome/podman-restart.override.conf`: the existing Tailscale-aware
-  rootless boot ordering, now versioned.
-- `oci/ansible/dns.yaml`: imports the same deployment; it no longer patches the
-  live settings independently.
-
-Use the existing pos SSH/sudo access, named Podman connection `pos`, and SOPS
-age identity from the established PKI recovery workflow. These are credential
-bootstrap prerequisites; do not put identities or plaintext settings in Git.
-The operator needs Ansible, SOPS, Podman/podman-compose and dig. Install the
-repository's pinned collections if necessary:
+Prerequisites: SSH/sudo access to pos, Ansible, SOPS, dig and the repository's
+SOPS age identity. Load the identity using the PKI recovery procedure; keep it
+outside Git. Install the pinned collections and deploy from the repository root:
 
 ```bash
 ansible-galaxy collection install -r oci/ansible/requirements.yaml
 ansible-playbook -i pos, docker/adguardhome/deploy.yaml
 ```
 
-The existing OCI workflow also works:
+The OCI DNS entrypoint runs the same deployment:
 
 ```bash
 cd oci/ansible
 ansible-playbook dns.yaml
 ```
 
-The playbook installs runtime/firewall prerequisites, ensures persistent
-private directories, user lingering, Podman socket/restart-policy startup,
-and the existing firewalld rules. It preserves both LAN and tailnet DNS
-53-to-5353 redirects, direct LAN TCP/UDP 5353 and existing UI bindings.
-It never reloads the whole firewall or restarts unrelated containers.
-Compose operations use `./remotepod.sh`, as required by AGENTS.md.
+Sources:
 
-Desired settings are decrypted in operator memory and validated using the
-pinned AdGuard binary in an isolated disposable container before changing the
-running resolver. Temporary plaintext is private and removed afterward.
-Semantic YAML comparison avoids restarts caused only by formatting. On actual
-configuration drift, the prior file is preserved once as a private
-`.before-iac` backup, AdGuard is stopped before writing settings, and Compose
-is converged in an `always` block. No query/statistics data is deleted.
-Editing while AdGuard is running can be overwritten by the application;
-see the [official Docker configuration instructions](https://github.com/AdguardTeam/AdGuardHome/wiki/Docker#additional-configuration).
+| File | Purpose |
+|---|---|
+| `docker/adguardhome/adguardhome.container.j2` | Image, network, ports, mounts and systemd restart/boot policy |
+| `docker/adguardhome/AdGuardHome.secret.sops.yaml` | Complete private settings, upstreams, filters and account credentials |
+| `kubernetes/pelican/manifests/wings-endpoints.yaml` | Wings addresses used to derive exact DNS records |
 
-Public/internal resolution and each exact Wings answer are checked after
-convergence. The native `--check-config` check also rejects malformed desired
-settings before DNS is stopped. A fresh host with the credential/host-access
-prerequisites can recreate the initialized service without the web wizard.
-Query history, caches and statistics are runtime data, not configuration.
+The rendered Quadlet lives at `~pos/.config/containers/systemd/adguardhome.container`.
+Its `[Install] WantedBy=default.target` section and user lingering provide boot
+activation. Systemd owns container restarts. AdGuard uses pasta networking and
+its existing bind mounts:
 
-## Changes and recovery
+- `/home/pos/.config/adguardhome`: configuration.
+- `/home/pos/apps/docker/adguardhome`: query history, filter caches and statistics.
 
-Edit the encrypted source with `sops docker/adguardhome/AdGuardHome.secret.sops.yaml`,
-review/commit the change and rerun deployment. The decrypted wrapper contains
-`data.AdGuardHome.yaml` as a YAML string. Durable settings changes belong here;
-manual web-UI edits are drift and will be replaced on reconciliation.
-The imported credentials and upstream choices were preserved, not rotated.
-No plaintext export or generated run report belongs in the repository.
+LAN/tailnet DNS port 53 is forwarded to the rootless listener on 5353. The web
+interface binds to the configured LAN/tailnet addresses on 3000. Settings and
+the candidate Quadlet are validated before the running resolver is changed.
+An actual settings change stops the service before writing, saves a private
+backup and starts the service again. Formatting-only differences do not
+restart it.
 
-After approved OCI address changes, run `render-inventory.py`, review the
-updated desired EndpointSlice, and deploy DNS through either entrypoint.
-Commit the desired target change for the normal GitOps workflow. CoreDNS
-continues forwarding `home.internal` to pos:5353; no new resolver VM is used.
+## Operate and check
 
-For recovery, retain the config/work volumes and use the reviewed source to
-recreate the service. Restore any required runtime-data backup separately.
-Keep SSH, the existing SOPS recovery identity and the named Podman connection
-available independently of DNS. A rejected configuration leaves the running
-resolver untouched. Investigate an actual Compose/start failure using its
-private diagnostics and pre-IaC backup before retrying; do not wipe volumes.
+Run service commands through the pos account:
 
-## Validation — October 30, 2026
+```bash
+ssh pos 'systemctl --user status adguardhome.service'
+ssh pos 'systemctl --user restart adguardhome.service'
+ssh pos 'journalctl --user -u adguardhome.service -n 50 --no-pager'
+dig @192.168.1.28 github.com
+dig +tcp @192.168.1.28 pelican.home.internal
+dig @100.114.113.82 wings-01.oci.home.internal
+```
 
-Production Ansible lint passes. The initial adoption preserved the running
-container; a full rerun changed zero resources. Native validation accepted
-the desired settings and rejected an invalid-port fixture without touching
-live DNS. LAN public/internal and exact Wings answers passed. The encrypted
-configuration uses the existing SOPS recipient; raw logs stay ignored.
-A fresh-host rebuild and host reboot were not performed; current-host
-convergence, native validation and boot configuration were verified.
-The separate [outage investigation](dns-network-incident-2026-10-30.md) records
-what the logs establish and what still requires router diagnostics.
+If DNS fails, check host reachability, the service journal, port bindings and
+firewalld redirects before changing the application configuration. Compare
+`dig @192.168.1.28 -p 5353 github.com` with the port-53 query to distinguish the
+container listener from host forwarding. Preserve logs privately.
+
+## Change settings or addresses
+
+```bash
+sops docker/adguardhome/AdGuardHome.secret.sops.yaml
+ansible-playbook -i pos, docker/adguardhome/deploy.yaml
+```
+
+Edit the YAML string under `data.AdGuardHome.yaml`, then commit the encrypted
+change. Web-UI settings edits are drift and will be replaced on reconciliation.
+Keep plaintext exports and runtime data outside Git.
+
+After OCI address changes, run `python3 oci/scripts/render-inventory.py`, review
+the desired EndpointSlice and redeploy DNS. CoreDNS forwards `home.internal`
+to pos:5353. Each Wings name must resolve to exactly its private VNIC address.
+For image upgrades, update `adguard_image` in the deployment playbook,
+check configuration compatibility, and deploy after preserving required data.
+
+## Migration and recovery
+
+The playbook recognizes the old Compose container, stops it, disables its
+restart policy and retains it as `adguardhome-compose-retained`. A failed
+initial migration restores that container. It refuses to overwrite an
+existing retained container or take over an unrelated container name.
+Other Podman services are not reconfigured.
+
+For normal recovery, correct/revert the source and rerun deployment. Restore
+a needed configuration backup from the private config directory while the
+service is stopped. Keep the work directory for history/statistics; a service
+restart or recreation does not require wiping it.
+
+For emergency rollback to the retained Compose container, run on pos:
+
+```bash
+systemctl --user stop adguardhome.service
+mv ~/.config/containers/systemd/adguardhome.container \
+   ~/.config/containers/systemd/adguardhome.container.disabled
+systemctl --user daemon-reload
+podman rename adguardhome-compose-retained adguardhome
+rollback_label=$(podman inspect --format '{{.MountLabel}}' adguardhome)
+if [ -n "$rollback_label" ]; then
+  podman unshare chcon -R "$rollback_label" \
+    ~/.config/adguardhome ~/apps/docker/adguardhome
+fi
+podman update --restart=unless-stopped adguardhome
+podman start adguardhome
+```
+
+Restore a compatible configuration backup before starting the retained
+container if its settings changed during an upgrade. Reapply Ansible after
+correcting the source to migrate back to Quadlet. Retained-container deletion
+is a separate cleanup decision; data directories must be preserved.

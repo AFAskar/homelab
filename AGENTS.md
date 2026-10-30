@@ -17,24 +17,24 @@ distro: alpine linux (doas not sudo)
 username: run-barry-run
 ssh config alias : optiplex
 
-# Remote Podman Compose
+# Rootless Podman services
 
-Use `./remotepod.sh` from the repository root for Compose workloads on `pos`.
-Do not use `podman compose` directly because its external Compose provider drops
-the SSH identity from the named Podman connection. The script resolves the
-connection URI and identity, exports the required remote Podman environment,
-and disables pod creation to avoid the remote pod API issue.
-
-Examples:
+Use Quadlet for Ansible-managed persistent Podman services. AdGuard is managed
+by `docker/adguardhome/deploy.yaml` and the user unit `adguardhome.service` on
+`pos`:
 
 ```bash
-./remotepod.sh -f docker/adguardhome.yaml ps
-./remotepod.sh -f docker/adguardhome.yaml up -d
-./remotepod.sh -f docker/adguardhome.yaml logs
+ansible-playbook -i pos, docker/adguardhome/deploy.yaml
+ssh pos 'systemctl --user status adguardhome.service'
+ssh pos 'journalctl --user -u adguardhome.service -n 50 --no-pager'
 ```
 
-The script uses the `pos` Podman connection by default. Set
-`PODMAN_CONNECTION=<name>` to target another configured connection.
+For workloads that still use Compose, use `./remotepod.sh` from the repository
+root. Do not use `podman compose` directly: its external provider drops the
+SSH identity. The wrapper resolves the named connection's URI/identity and
+disables pod creation for remote API compatibility. It defaults to connection
+`pos`; set `PODMAN_CONNECTION` to use another named connection. Do not recreate
+a Quadlet-managed service through Compose.
 
 # Changes and commits
 
