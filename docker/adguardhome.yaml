@@ -5,12 +5,12 @@ services:
     restart: unless-stopped
     network_mode: pasta
     ports:
-      - "${ADGUARD_LAN_IP}:5353:53/tcp"
-      - "${ADGUARD_LAN_IP}:5353:53/udp"
-      - "${ADGUARD_LAN_IP}:3000:3000/tcp"
-      - "${ADGUARD_TAILSCALE_IP}:5353:53/tcp"
-      - "${ADGUARD_TAILSCALE_IP}:5353:53/udp"
-      - "${ADGUARD_TAILSCALE_IP}:3000:3000/tcp"
+      - "${ADGUARD_LAN_IP:-192.168.1.28}:5353:53/tcp"
+      - "${ADGUARD_LAN_IP:-192.168.1.28}:5353:53/udp"
+      - "${ADGUARD_LAN_IP:-192.168.1.28}:3000:3000/tcp"
+      - "${ADGUARD_TAILSCALE_IP:-100.114.113.82}:5353:53/tcp"
+      - "${ADGUARD_TAILSCALE_IP:-100.114.113.82}:5353:53/udp"
+      - "${ADGUARD_TAILSCALE_IP:-100.114.113.82}:3000:3000/tcp"
     volumes:
       - /home/pos/apps/docker/adguardhome:/opt/adguardhome/work:Z
       - /home/pos/.config/adguardhome:/opt/adguardhome/conf:Z
