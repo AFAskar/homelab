@@ -12,6 +12,7 @@ resources:
 - node-certificates.yaml
 - storage.yaml
 - monitoring.yaml
+- game-probes.yaml
 - wings-endpoints.yaml
 generators:
 - ksops-generator.yaml

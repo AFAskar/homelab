@@ -45,3 +45,13 @@ e=yaml.safe_load(endpoint_path.read_text())
 e['endpoints']=[{'addresses':[str(ipaddress.IPv4Address(v['private_ip']))], 'hostname':name, 'conditions':{'ready':True}} for name,v in get('wings_instances').items()]
 endpoint_path.write_text(yaml.safe_dump(e,sort_keys=False))
 print('Updated tracked monitoring EndpointSlice: review and commit the actual targets before sync.')
+
+probe_path=root.parent/'kubernetes/pelican/manifests/game-probes.yaml'
+probes=list(yaml.safe_load_all(probe_path.read_text()))
+for probe in probes:
+    if probe.get('kind') == 'Probe':
+        probe['spec']['targets']['staticConfig']['static']=[
+            str(ipaddress.IPv4Address(v['public_ip']))+':25565'
+            for _,v in sorted(get('wings_instances').items())]
+probe_path.write_text(yaml.safe_dump_all(probes,sort_keys=False))
+print('Refreshed public game probe addresses from actual Terraform outputs.')

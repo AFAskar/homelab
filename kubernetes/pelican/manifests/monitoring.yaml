@@ -37,6 +37,13 @@ spec:
   groups:
   - name: oci-wings
     rules:
+    - alert: OciPublicGameUnreachable
+      expr: probe_success{job="oci-public-games"} == 0
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: A public OCI game allocation is unreachable from the homelab.
     - alert: OciWingsUnreachable
       expr: up{job="oci-wings"} == 0
       for: 5m
