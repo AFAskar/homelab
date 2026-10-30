@@ -11,6 +11,8 @@ OCI_CLI_REGION=$(terraform -chdir="$root" output -raw region)
 export OCI_CLI_PROFILE
 OCI_CLI_PROFILE=$(terraform -chdir="$root" output -raw oci_profile)
 object="selected/$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$1")"
-oci os object put --namespace-name "$namespace" --bucket-name "$bucket" --name "$object" --file "$1" --no-overwrite
+digest=$(sha256sum "$1" | cut -d ' ' -f 1)
+metadata=$(printf '{"sha256":"%s"}' "$digest")
+oci os object put --namespace-name "$namespace" --bucket-name "$bucket" --name "$object" --file "$1" --metadata "$metadata" --no-overwrite
 sha256sum "$1"
 printf 'Restore object: %s\n' "$object"
