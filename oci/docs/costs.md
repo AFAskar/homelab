@@ -18,7 +18,7 @@ python3 oci/scripts/estimate_cost.py --capacity-json oci/inventory/capacity.json
 python3 oci/scripts/spend-status.py --subscription-id 100001000344740
 ```
 
-Supply the current remaining credit with `--remaining-eur`; the default €250 is the original grant, not a balance read. Add measured request/egress/tax charges using `--extra-eur`. Use `--hours 744` for a 31-day month. Rates are fetched from the official [EUR catalog](https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=EUR) and [USD catalog](https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD), refreshed October 31, 2026. [ECB XML](https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml) dated October 30 gives €1 = $1.1172; FX is for USD comparison, not EUR billing.
+Supply the current remaining credit with `--remaining-eur`; the default €250 is the original grant, not a balance read. Add measured request/egress/tax charges using `--extra-eur`. `--hours 744` changes continuous compute runtime to 744 hours; storage rows remain monthly and `credit_days_at_average_burn` keeps a fixed 730-hour basis. Treat that field as a 730-hour projection, not a consistent 31-day burn calculation. Rates are fetched from the official [EUR catalog](https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=EUR) and [USD catalog](https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD), refreshed October 31, 2026. [ECB XML](https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml) dated October 30 gives €1 = $1.1172; FX is for USD comparison, not EUR billing.
 
 | SKU | Component | USD list rate | EUR list rate |
 |---|---|---:|---:|
