@@ -8,6 +8,7 @@ From the repository root:
 
 ```bash
 umask 077
+mkdir -p oci/inventory/reports
 python3 oci/scripts/estimate_cost.py --image-gb 86 --upload-gb 18 \
   --output oci/inventory/reports/cost-estimate.json
 # After applying a capacity change, use the actual managed topology:
