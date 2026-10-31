@@ -57,7 +57,17 @@ No new OCI instance, paid service, CA or client certificate is required.
 ## Check access
 
 From Thor, request `https://pelican.home.internal:8443/api/remote/servers`
-against pos's tailnet IP with verified Panel SNI/CA. Require 401 without a
+against pos's tailnet IP with verified Panel SNI/CA. Override the OCI guest's
+normal DNS mapping to Thor for this direct listener check:
+
+```bash
+curl --resolve pelican.home.internal:8443:100.114.113.82 \
+  --cacert /usr/local/share/ca-certificates/homelab-root-ca.crt \
+  --silent --output /dev/null --write-out '%{http_code}\n' \
+  https://pelican.home.internal:8443/api/remote/servers
+```
+
+Require 401 without a
 node token and 200 with the appropriate token. Do not put a node token in a
 shell command, process argument or committed report. Supply it through a
 private stdin/request mechanism.
