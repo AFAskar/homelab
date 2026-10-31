@@ -6,8 +6,7 @@ resource "oci_core_volume" "wings" {
   size_in_gbs         = each.value.data_gb
   vpus_per_gb         = 10
   freeform_tags       = local.tags
-  # Restore this guard after the reviewed wings-03 retirement apply.
-  lifecycle { prevent_destroy = false }
+  lifecycle { prevent_destroy = true }
 }
 resource "oci_core_volume_attachment" "wings" {
   for_each        = local.paid_wings

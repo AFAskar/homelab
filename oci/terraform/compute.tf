@@ -30,8 +30,7 @@ resource "oci_core_instance" "wings" {
   preserve_boot_volume = true
   freeform_tags        = local.tags
   depends_on           = [terraform_data.review_gate, terraform_data.network_gate]
-  # Restore this guard after the reviewed wings-03 retirement apply.
-  lifecycle { prevent_destroy = false }
+  lifecycle { prevent_destroy = true }
 }
 
 # Import first. Freeze launch-time fields until a reviewed, zero-replacement plan.

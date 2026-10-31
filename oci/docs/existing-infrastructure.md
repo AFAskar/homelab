@@ -69,7 +69,8 @@ shared gateways, routes, DHCP defaults and Thor VNIC/storage dependencies.
 
 | Resource | Allocation / data | Recovery source |
 |---|---|---|
-| wings-01..03 | Each E6 2 OCPUs/16 GB, Ubuntu 26.04 amd64, 50 GB boot + 200 GB balanced data | Terraform + Wings role; retain data disks |
+| wings-01 | E6 4 OCPUs/32 GB, Ubuntu 26.04 amd64, 50 GB boot + 400 GB balanced data | Terraform + Wings role; retain data disk |
+| wings-02 | E6 2 OCPUs/16 GB, Ubuntu 26.04 amd64, 50 GB boot + 200 GB balanced data | Terraform + Wings role; retain data disk |
 | Paid Wings data | ext4 UUID mounts at `/srv/pelican`; games under `volumes/` | Selected encrypted backups |
 | State bucket | Private Standard `homelab-tfstate`, versioned | Bootstrap prerequisite outside this root |
 | Image-source bucket | Private `homelab-win11-images` | Terraform bucket; import tooling owns source objects/images |
