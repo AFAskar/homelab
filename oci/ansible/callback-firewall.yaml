@@ -1,0 +1,73 @@
+# Install on BOTH k3s hosts before exposing the callback listener. PREROUTING
+# filtering precedes kube-proxy/ServiceLB DNAT, unlike an INPUT-only rule.
+- name: Restrict the Panel callback listener to the OCI router
+  hosts: homelab
+  become: true
+  tasks:
+    - name: Install callback firewall script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/pelican-callback-firewall
+        mode: '0750'
+        content: |
+          #!/bin/sh
+          set -eu
+          iptables -t raw -N PELICAN-CALLBACK 2>/dev/null || true
+          iptables -t raw -F PELICAN-CALLBACK
+          iptables -t raw -A PELICAN-CALLBACK -i tailscale0 -s 100.89.233.80/32 -j RETURN
+          iptables -t raw -A PELICAN-CALLBACK -j DROP
+          iptables -t raw -C PREROUTING -m addrtype --dst-type LOCAL -p tcp -m multiport --dports 8443,32443 -j PELICAN-CALLBACK 2>/dev/null || \
+            iptables -t raw -I PREROUTING 1 -m addrtype --dst-type LOCAL -p tcp -m multiport --dports 8443,32443 -j PELICAN-CALLBACK
+          # No IPv6 callback path is authorized.
+          ip6tables -t raw -C PREROUTING -m addrtype --dst-type LOCAL -p tcp -m multiport --dports 8443,32443 -j DROP 2>/dev/null || \
+            ip6tables -t raw -I PREROUTING 1 -m addrtype --dst-type LOCAL -p tcp -m multiport --dports 8443,32443 -j DROP
+    - name: Persist callback filtering on systemd
+      when: ansible_facts.service_mgr == 'systemd'
+      block:
+        - name: Write callback firewall unit
+          ansible.builtin.copy:
+            dest: /etc/systemd/system/pelican-callback-firewall.service
+            mode: '0644'
+            content: |
+              [Unit]
+              Description=Restrict Pelican callback listener before Kubernetes DNAT
+              Before=k3s.service k3s-agent.service
+              [Service]
+              Type=oneshot
+              ExecStart=/usr/local/sbin/pelican-callback-firewall
+              RemainAfterExit=yes
+              [Install]
+              WantedBy=multi-user.target
+        - name: Enable callback firewall unit
+          ansible.builtin.systemd_service:
+            name: pelican-callback-firewall
+            enabled: true
+            state: started
+            daemon_reload: true
+    - name: Persist callback filtering on OpenRC
+      when: ansible_facts.service_mgr == 'openrc'
+      block:
+        - name: Write early callback firewall service
+          ansible.builtin.copy:
+            dest: /etc/init.d/pelican-callback-firewall
+            mode: '0755'
+            content: |
+              #!/sbin/openrc-run
+              description="Restrict Pelican callback listener before Kubernetes DNAT"
+              depend() {
+                need localmount
+                before k3s k3s-agent
+              }
+              start() {
+                ebegin "Installing Pelican callback firewall"
+                /usr/local/sbin/pelican-callback-firewall
+                eend $?
+              }
+        - name: Enable early callback filtering
+          ansible.builtin.service:
+            name: pelican-callback-firewall
+            runlevel: boot
+            enabled: true
+            state: started
+    - name: Apply idempotent callback filtering
+      ansible.builtin.command: /usr/local/sbin/pelican-callback-firewall
+      changed_when: false

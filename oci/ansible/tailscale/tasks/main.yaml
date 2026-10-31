@@ -1,0 +1,114 @@
+- name: Require discovered router support and non-overlapping routes
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - tailscale_version is defined
+      - tailscale_routes | length > 0
+      - tailscale_tag == 'tag:oci-router'
+    fail_msg: Discover wings-04 OS, resources, network and route overlap before selecting it as router.
+- name: Install official repository key
+  ansible.builtin.get_url:
+    url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_facts.distribution_release }}.noarmor.gpg"
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    mode: '0644'
+- name: Install official repository definition
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg]
+      https://pkgs.tailscale.com/stable/ubuntu {{ ansible_facts.distribution_release }} main
+    filename: tailscale
+    state: present
+- name: Install controlled Tailscale version
+  ansible.builtin.apt:
+    name: "tailscale={{ tailscale_version }}"
+    state: present
+    update_cache: true
+- name: Persist IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    reload: true
+    state: present
+    sysctl_file: /etc/sysctl.d/99-oci-subnet-router.conf
+- name: Enable tailscaled
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
+- name: Read authentication status
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status
+  changed_when: false
+  failed_when: tailscale_status.rc not in [0, 1]
+- name: Require scoped authentication key only for new enrollment
+  ansible.builtin.assert:
+    that: tailscale_auth_key | default('') | length > 0
+  when: (tailscale_status.stdout | from_json).BackendState != 'Running'
+  no_log: true
+- name: Enroll router using ephemeral root-only key file
+  when: (tailscale_status.stdout | from_json).BackendState != 'Running'
+  block:
+    - name: Create private auth-key file
+      ansible.builtin.copy:
+        content: "{{ tailscale_auth_key }}"
+        dest: /run/tailscale-enrollment-key
+        mode: '0600'
+      no_log: true
+    - name: Authenticate router without putting the key in argv
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - up
+          - --auth-key=file:/run/tailscale-enrollment-key
+          - "--advertise-tags={{ tailscale_tag }}"
+          - "--advertise-routes={{ tailscale_routes | join(',') }}"
+          - --snat-subnet-routes=true
+          - --accept-dns=false
+      no_log: true
+      changed_when: true
+  always:
+    - name: Remove transient enrollment key
+      ansible.builtin.file:
+        path: /run/tailscale-enrollment-key
+        state: absent
+      no_log: true
+- name: Read current route preferences
+  ansible.builtin.command: tailscale debug prefs
+  register: router_prefs
+  changed_when: false
+  no_log: true
+- name: Advertise router tag through the supported up command
+  # `tailscale set` does not support --advertise-tags. Preserve the discovered
+  # non-default client settings when up requires the complete flag set.
+  ansible.builtin.command:
+    argv:
+      - tailscale
+      - up
+      - "--advertise-tags={{ tailscale_tag }}"
+      - "--advertise-routes={{ tailscale_routes | join(',') }}"
+      - --snat-subnet-routes=true
+      - --accept-dns=false
+      - --netfilter-mode=on
+      - "--accept-routes={{ (router_prefs.stdout | from_json).RouteAll | ternary('true', 'false') }}"
+      - "--ssh={{ (router_prefs.stdout | from_json).RunSSH | ternary('true', 'false') }}"
+      - "--hostname={{ (router_prefs.stdout | from_json).Hostname }}"
+      - "--operator={{ (router_prefs.stdout | from_json).OperatorUser | default('') }}"
+      - "--shields-up={{ (router_prefs.stdout | from_json).ShieldsUp | ternary('true', 'false') }}"
+  when: ((router_prefs.stdout | from_json).AdvertiseTags | default([], true)) != [tailscale_tag]
+  changed_when: true
+- name: Persist desired subnet routing preferences with Tailscale netfilter
+  ansible.builtin.command:
+    argv:
+      - tailscale
+      - set
+      - "--advertise-routes={{ tailscale_routes | join(',') }}"
+      - --snat-subnet-routes=true
+      - --accept-dns=false
+      - --netfilter-mode=on
+  when: >-
+    ((router_prefs.stdout | from_json).AdvertiseRoutes | default([], true) | sort) != (tailscale_routes | sort)
+    or (router_prefs.stdout | from_json).NoSNAT
+    or (router_prefs.stdout | from_json).CorpDNS
+    or (router_prefs.stdout | from_json).NetfilterMode != 2
+  changed_when: true

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: pelican
+resources:
+- ../../../pki
+- namespace.yaml
+- panel.yaml
+- service.yaml
+- ingress.yaml
+- callback-ingress.yaml
+- certificate.yaml
+- node-certificates.yaml
+- storage.yaml
+- monitoring.yaml
+- game-probes.yaml
+- wings-endpoints.yaml
+generators:
+- ksops-generator.yaml

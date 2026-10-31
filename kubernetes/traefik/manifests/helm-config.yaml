@@ -9,9 +9,23 @@ spec:
         allowExternalNameServices: true
     ports:
       web:
+        asDefault: true
         http:
           redirections:
             entryPoint:
               to: websecure
               scheme: https
               permanent: true
+      websecure:
+        asDefault: true
+      # Never a default: ordinary Ingress objects must not appear here.
+      pelican-callback:
+        port: 9443
+        exposedPort: 8443
+        nodePort: 32443
+        expose:
+          default: true
+        protocol: TCP
+        http:
+          tls:
+            enabled: true

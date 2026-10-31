@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oci-game-probes
+data:
+  config.yml: "modules:\n  tcp_connect:\n    prober: tcp\n    timeout: 5s\n"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oci-game-probes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oci-game-probes
+  template:
+    metadata:
+      labels:
+        app: oci-game-probes
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: blackbox
+        image: quay.io/prometheus/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+        args:
+        - --config.file=/etc/blackbox/config.yml
+        ports:
+        - name: http
+          containerPort: 9115
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        readinessProbe:
+          tcpSocket:
+            port: http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/blackbox
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: oci-game-probes
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oci-game-probes
+spec:
+  selector:
+    app: oci-game-probes
+  ports:
+  - name: http
+    port: 9115
+    targetPort: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: oci-public-games
+  labels:
+    release: monitoring
+spec:
+  jobName: oci-public-games
+  interval: 30s
+  scrapeTimeout: 10s
+  module: tcp_connect
+  prober:
+    url: oci-game-probes.pelican.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+      - 84.13.144.6:25565
+      - 84.8.111.80:25565
+      - 84.13.136.92:25565

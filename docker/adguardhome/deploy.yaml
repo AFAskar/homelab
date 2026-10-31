@@ -1,0 +1,358 @@
+# Run from repository root with the existing SOPS age identity loaded:
+# ansible-playbook -i pos, docker/adguardhome/deploy.yaml
+- name: Reconcile the complete existing rootless AdGuard deployment
+  hosts: pos
+  remote_user: pos
+  vars:
+    adguard_repository_root: "{{ playbook_dir }}/../.."
+    adguard_image: docker.io/adguard/adguardhome:v0.107.78
+    adguard_lan_ip: 192.168.1.28
+    adguard_tailnet_ip: 100.114.113.82
+    adguard_config_directory: /home/pos/.config/adguardhome
+    adguard_config_path: "{{ adguard_config_directory }}/AdGuardHome.yaml"
+    adguard_work_directory: /home/pos/apps/docker/adguardhome
+    adguard_unit_directory: /home/pos/.config/containers/systemd
+    adguard_legacy_name: adguardhome-compose-retained
+    adguard_systemd_environment:
+      XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.user_uid }}"
+      DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.user_uid }}/bus"
+  tasks:
+    - name: Require the discovered platform and account
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family == 'RedHat'
+          - ansible_facts.user_id == 'pos'
+    - name: Ensure rootless runtime and firewall prerequisites
+      become: true
+      ansible.builtin.dnf:
+        name: [podman, passt, firewalld, python3-firewall]
+        state: present
+    - name: Ensure firewalld is enabled without reloading unrelated rules
+      become: true
+      ansible.builtin.systemd_service:
+        name: firewalld
+        enabled: true
+        state: started
+    - name: Preserve DNS port forwarding on the existing interfaces
+      become: true
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: >-
+          rule family="ipv4" destination address="{{ item.0 }}"
+          forward-port port="53" protocol="{{ item.1 }}" to-port="5353"
+        permanent: true
+        immediate: true
+        state: enabled
+      loop: "{{ [adguard_lan_ip, adguard_tailnet_ip] | product(['tcp', 'udp']) | list }}"
+    - name: Preserve direct LAN resolver access
+      become: true
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: >-
+          rule family="ipv4" source address="192.168.1.0/24"
+          destination address="{{ adguard_lan_ip }}" port port="5353" protocol="{{ item }}" accept
+        permanent: true
+        immediate: true
+        state: enabled
+      loop: [tcp, udp]
+    - name: Preserve existing administrator interface access
+      become: true
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: >-
+          rule family="ipv4" destination address="{{ item }}" port port="3000" protocol="tcp" accept
+        permanent: true
+        immediate: true
+        state: enabled
+      loop: "{{ [adguard_lan_ip, adguard_tailnet_ip] }}"
+    - name: Check rootless service persistence
+      ansible.builtin.command: loginctl show-user pos -p Linger --value
+      register: adguard_linger
+      changed_when: false
+    - name: Enable existing account service persistence
+      become: true
+      ansible.builtin.command: loginctl enable-linger pos
+      when: adguard_linger.stdout != 'yes'
+      changed_when: true
+    - name: Ensure persistent directories without touching existing data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0700'
+      loop:
+        - "{{ adguard_config_directory }}"
+        - "{{ adguard_work_directory }}"
+        - "{{ adguard_unit_directory }}"
+    - name: Decrypt desired AdGuard settings only in operator memory
+      ansible.builtin.command:
+        argv: [sops, --decrypt, "{{ playbook_dir }}/AdGuardHome.secret.sops.yaml"]
+      delegate_to: localhost
+      register: adguard_decrypted
+      changed_when: false
+      no_log: true
+    - name: Load complete desired settings and tracked OCI endpoints
+      ansible.builtin.set_fact:
+        adguard_source: "{{ (adguard_decrypted.stdout | from_yaml).data['AdGuardHome.yaml'] | from_yaml }}"
+        adguard_endpoints: "{{ (lookup('file', adguard_repository_root + '/kubernetes/pelican/manifests/wings-endpoints.yaml') | from_yaml).endpoints }}"
+      no_log: true
+    - name: Build OCI hostname rules from desired monitoring endpoints
+      ansible.builtin.set_fact:
+        adguard_wings_rules: >-
+          {{ (adguard_wings_rules | default([])) +
+             ['||' + item.hostname + '.oci.home.internal^$dnsrewrite=NOERROR;A;' + item.addresses[0]] }}
+      loop: "{{ adguard_endpoints }}"
+      loop_control:
+        label: "{{ item.hostname }}"
+    - name: Reconcile derived records with the encrypted settings
+      ansible.builtin.set_fact:
+        adguard_desired: >-
+          {{ adguard_source | combine({'user_rules':
+             (adguard_source.user_rules | default([]) |
+              reject('match', '^[|][|]wings-0[1-4][.]oci[.]home[.]internal') | list) +
+             (adguard_wings_rules | default([]))}) }}
+      no_log: true
+    - name: Validate desired settings before touching the running resolver
+      block:
+        - name: Create a private disposable validation directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: homelab-adguard-check-
+          register: adguard_validation_file
+          changed_when: false
+          no_log: true
+        - name: Stage the desired configuration for validation only
+          ansible.builtin.copy:
+            content: "{{ adguard_desired | to_nice_yaml(indent=2, sort_keys=false) }}"
+            dest: "{{ adguard_validation_file.path }}/AdGuardHome.yaml"
+            mode: '0600'
+          changed_when: false
+          no_log: true
+        - name: Check configuration with the pinned native AdGuard binary
+          ansible.builtin.command:
+            argv:
+              - podman
+              - run
+              - --rm
+              - --network=none
+              - -v
+              - "{{ adguard_validation_file.path }}/AdGuardHome.yaml:/config.yaml:ro,Z"
+              - "{{ adguard_image }}"
+              - --check-config
+              - -c
+              - /config.yaml
+          changed_when: false
+          no_log: true
+        - name: Render a candidate Quadlet before changing the running service
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/adguardhome.container.j2"
+            dest: "{{ adguard_validation_file.path }}/adguardhome.container"
+            mode: '0644'
+          changed_when: false
+        - name: Validate the Quadlet with the installed generator
+          ansible.builtin.command: /usr/libexec/podman/quadlet -dryrun -user
+          environment:
+            QUADLET_UNIT_DIRS: "{{ adguard_validation_file.path }}"
+          changed_when: false
+      always:
+        - name: Remove only the disposable validation directory
+          ansible.builtin.file:
+            path: "{{ adguard_validation_file.path }}"
+            state: absent
+          when: adguard_validation_file.path is defined
+          changed_when: false
+          no_log: true
+    - name: Inspect the existing container without exposing settings
+      ansible.builtin.command: podman inspect adguardhome
+      register: adguard_before
+      failed_when: adguard_before.rc not in [0, 125]
+      changed_when: false
+      no_log: true
+    - name: Identify the current container owner
+      ansible.builtin.set_fact:
+        adguard_legacy: >-
+          {{ adguard_before.rc == 0 and
+             (adguard_before.stdout | from_json)[0].Config.Labels.get('io.podman.compose.service', '') == 'adguardhome' }}
+      no_log: true
+    - name: Refuse to replace an unrelated container
+      ansible.builtin.assert:
+        that:
+          - >-
+            adguard_before.rc != 0 or adguard_legacy or
+            (adguard_before.stdout | from_json)[0].Config.Labels.get('PODMAN_SYSTEMD_UNIT', '') == 'adguardhome.service'
+        fail_msg: The adguardhome name belongs to another workload; inspect its ownership before proceeding.
+      no_log: true
+    - name: Check the retained migration name is unused
+      ansible.builtin.command:
+        argv: [podman, container, exists, "{{ adguard_legacy_name }}"]
+      register: adguard_retained
+      failed_when: adguard_retained.rc not in [0, 1]
+      changed_when: false
+      when: adguard_legacy
+    - name: Preserve an existing rollback container from overwrite
+      ansible.builtin.assert:
+        that: adguard_retained.rc == 1
+        fail_msg: The retained container name already exists; inspect it before retrying migration.
+      when: adguard_legacy
+    - name: Inspect existing private configuration
+      ansible.builtin.stat:
+        path: "{{ adguard_config_path }}"
+      register: adguard_config_stat
+    - name: Read existing settings for semantic drift detection
+      ansible.builtin.slurp:
+        src: "{{ adguard_config_path }}"
+      register: adguard_existing
+      when: adguard_config_stat.stat.exists
+      no_log: true
+    - name: Determine configuration drift before any DNS interruption
+      ansible.builtin.set_fact:
+        adguard_config_changed: >-
+          {{ not adguard_config_stat.stat.exists or
+             (adguard_existing.content | default('') | b64decode | from_yaml) != adguard_desired }}
+      no_log: true
+    - name: Verify Tailscale readiness before changing the resolver
+      ansible.builtin.command:
+        argv: [/usr/bin/tailscale, wait, --timeout=60s]
+      changed_when: false
+    - name: Reconcile the dedicated systemd service
+      block:
+        - name: Retire the Compose restart policy before migration
+          ansible.builtin.command: podman update --restart=no adguardhome
+          when: adguard_legacy
+          changed_when: true
+        - name: Stop only the legacy DNS container
+          ansible.builtin.command: podman stop adguardhome
+          when: adguard_legacy
+          changed_when: true
+        - name: Retain the legacy container under a separate rollback name
+          ansible.builtin.command:
+            argv: [podman, rename, adguardhome, "{{ adguard_legacy_name }}"]
+          register: adguard_renamed
+          when: adguard_legacy
+          changed_when: true
+        - name: Stop the Quadlet service before changing its configuration
+          ansible.builtin.systemd_service:
+            name: adguardhome.service
+            scope: user
+            state: stopped
+          environment: "{{ adguard_systemd_environment }}"
+          when: adguard_config_changed and not adguard_legacy and adguard_before.rc == 0
+        - name: Write the validated settings with a private rollback backup
+          ansible.builtin.copy:
+            content: "{{ adguard_desired | to_nice_yaml(indent=2, sort_keys=false) }}"
+            dest: "{{ adguard_config_path }}"
+            mode: '0600'
+            backup: true
+          register: adguard_written
+          when: adguard_config_changed
+          no_log: true
+        - name: Install the authoritative rootless Quadlet
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/adguardhome.container.j2"
+            dest: "{{ adguard_unit_directory }}/adguardhome.container"
+            mode: '0644'
+          register: adguard_quadlet
+        - name: Generate and converge the AdGuard service
+          ansible.builtin.systemd_service:
+            name: adguardhome.service
+            scope: user
+            daemon_reload: "{{ adguard_quadlet.changed or adguard_legacy or adguard_before.rc != 0 }}"
+            state: >-
+              {{ 'restarted' if adguard_quadlet.changed and not adguard_legacy and
+                 adguard_before.rc == 0 and not adguard_config_changed else 'started' }}
+          environment: "{{ adguard_systemd_environment }}"
+      rescue:
+        - name: Stop a failed initial Quadlet migration before restoring the legacy container
+          ansible.builtin.systemd_service:
+            name: adguardhome.service
+            scope: user
+            state: stopped
+          environment: "{{ adguard_systemd_environment }}"
+          failed_when: false
+          when: adguard_legacy
+        - name: Inspect the initial migration unit
+          ansible.builtin.stat:
+            path: "{{ adguard_unit_directory }}/adguardhome.container"
+          register: adguard_failed_unit
+          when: adguard_legacy
+        - name: Quarantine the failed migration unit to prevent boot conflicts
+          ansible.builtin.command:
+            argv:
+              - mv
+              - "{{ adguard_unit_directory }}/adguardhome.container"
+              - "{{ adguard_unit_directory }}/adguardhome.container.failed-{{ ansible_facts.date_time.epoch }}"
+          changed_when: true
+          when: adguard_legacy and adguard_failed_unit.stat.exists
+        - name: Reload user units after quarantining an initial failed migration
+          ansible.builtin.systemd_service:
+            scope: user
+            daemon_reload: true
+          environment: "{{ adguard_systemd_environment }}"
+          when: adguard_legacy
+        - name: Restore the legacy container name when it was retained
+          ansible.builtin.command:
+            argv: [podman, rename, "{{ adguard_legacy_name }}", adguardhome]
+          changed_when: true
+          when: adguard_legacy and adguard_renamed.rc | default(1) == 0
+        - name: Restore the configuration from this failed attempt
+          ansible.builtin.copy:
+            remote_src: true
+            src: "{{ adguard_written.backup_file }}"
+            dest: "{{ adguard_config_path }}"
+            mode: '0600'
+          when: adguard_legacy and adguard_written.backup_file is defined
+          no_log: true
+        - name: Restore private volume labels for the retained container
+          ansible.builtin.command:
+            argv:
+              - podman
+              - unshare
+              - chcon
+              - -R
+              - "{{ (adguard_before.stdout | from_json)[0].MountLabel }}"
+              - "{{ adguard_config_directory }}"
+              - "{{ adguard_work_directory }}"
+          changed_when: true
+          when: adguard_legacy and (adguard_before.stdout | from_json)[0].MountLabel | length > 0
+        - name: Restore the previous legacy restart policy
+          ansible.builtin.command:
+            argv: [podman, update, "--restart={{ (adguard_before.stdout | from_json)[0].HostConfig.RestartPolicy.Name }}", adguardhome]
+          changed_when: true
+          when: adguard_legacy
+        - name: Restore the legacy resolver after a failed migration
+          ansible.builtin.command: podman start adguardhome
+          changed_when: true
+          when: adguard_legacy
+        - name: Report deployment failure without removing persistent data
+          ansible.builtin.fail:
+            msg: AdGuard deployment failed. Inspect the user service journal and correct the source before retrying; persistent data was retained.
+    - name: Verify container state and report actual service recreation
+      ansible.builtin.command: podman inspect adguardhome
+      register: adguard_after
+      changed_when: >-
+        adguard_before.rc != 0 or
+        (adguard_after.stdout | from_json)[0].State.StartedAt !=
+        (adguard_before.stdout | from_json)[0].State.StartedAt
+      failed_when: not (adguard_after.stdout | from_json)[0].State.Running
+      no_log: true
+    - name: Verify public and internal DNS through the normal LAN listener
+      ansible.builtin.command:
+        argv: [dig, +short, "@{{ adguard_lan_ip }}", -p, '53', "{{ item }}"]
+      delegate_to: localhost
+      loop: [github.com, pelican.home.internal]
+      register: adguard_answer
+      changed_when: false
+      until: adguard_answer.rc == 0 and adguard_answer.stdout_lines | length > 0
+      retries: 5
+      delay: 2
+    - name: Verify every Wings name has exactly its desired private address
+      ansible.builtin.command:
+        argv: [dig, +short, "@{{ adguard_lan_ip }}", -p, '53', "{{ item.hostname }}.oci.home.internal"]
+      delegate_to: localhost
+      loop: "{{ adguard_endpoints }}"
+      loop_control:
+        label: "{{ item.hostname }}"
+      register: adguard_wings_answer
+      changed_when: false
+      until: adguard_wings_answer.stdout_lines == [item.addresses[0]]
+      retries: 5
+      delay: 2

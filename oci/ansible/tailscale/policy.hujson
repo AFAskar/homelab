@@ -1,0 +1,398 @@
+{
+  "groups": {
+    "group:homelab-owner": [
+      "3zozal3skre@gmail.com"
+    ]
+  },
+  "hosts": {
+    "admin-laptop": "100.66.202.74",
+    "admin-freyr": "100.82.125.5",
+    "pos": "100.114.113.82",
+    "optiplex": "100.77.7.115",
+    "thor": "100.89.233.80",
+    "pos-lan": "192.168.1.28",
+    "optiplex-lan": "192.168.1.27",
+    "wings-04-private": "10.10.50.10",
+    "oci-wings-subnet": "10.10.50.0/24",
+    "oci-windows-subnet": "10.10.10.0/24",
+    "other-member-desktop": "100.92.186.41",
+    "other-member-laptop": "100.90.203.86",
+    "owner-phone": "100.88.31.107",
+    "old-home-router": "100.116.46.69"
+  },
+  "acls": [],
+  "grants": [
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "pos",
+        "optiplex",
+        "thor",
+        "tag:oci-router",
+        "pos-lan",
+        "optiplex-lan"
+      ],
+      "ip": [
+        "tcp:22"
+      ]
+    },
+    {
+      "src": [
+        "admin-laptop"
+      ],
+      "dst": [
+        "admin-freyr"
+      ],
+      "ip": [
+        "tcp:22",
+        "tcp:3389"
+      ]
+    },
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "pos",
+        "optiplex",
+        "pos-lan",
+        "optiplex-lan"
+      ],
+      "ip": [
+        "tcp:80",
+        "tcp:443"
+      ]
+    },
+    {
+      "src": [
+        "owner-phone"
+      ],
+      "dst": [
+        "pos",
+        "optiplex"
+      ],
+      "ip": [
+        "tcp:80",
+        "tcp:443"
+      ]
+    },
+    {
+      "src": [
+        "owner-phone"
+      ],
+      "dst": [
+        "oci-wings-subnet"
+      ],
+      "ip": [
+        "tcp:8080"
+      ]
+    },
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "pos",
+        "pos-lan"
+      ],
+      "ip": [
+        "tcp:6443",
+        "tcp:3000",
+        "tcp:5353",
+        "udp:5353"
+      ]
+    },
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "oci-wings-subnet"
+      ],
+      "ip": [
+        "tcp:22",
+        "tcp:2022",
+        "tcp:8080",
+        "tcp:9100"
+      ]
+    },
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "oci-windows-subnet"
+      ],
+      "ip": [
+        "tcp:3389"
+      ]
+    },
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "thor",
+        "tag:oci-router"
+      ],
+      "ip": [
+        "tcp:8080",
+        "tcp:2022",
+        "tcp:9100"
+      ]
+    },
+    {
+      "src": [
+        "pos",
+        "optiplex"
+      ],
+      "dst": [
+        "oci-wings-subnet",
+        "thor",
+        "tag:oci-router"
+      ],
+      "ip": [
+        "tcp:8080",
+        "tcp:9100"
+      ]
+    },
+    {
+      "src": [
+        "thor",
+        "tag:oci-router"
+      ],
+      "dst": [
+        "pos"
+      ],
+      "ip": [
+        "tcp:8443"
+      ]
+    },
+    {
+      "src": [
+        "autogroup:member"
+      ],
+      "dst": [
+        "pos"
+      ],
+      "ip": [
+        "tcp:53",
+        "udp:53"
+      ]
+    }
+  ],
+  "ssh": [],
+  "tests": [
+    {
+      "src": "admin-laptop",
+      "proto": "tcp",
+      "accept": [
+        "pos:22",
+        "optiplex:22",
+        "thor:22",
+        "pos:443",
+        "pos:6443",
+        "pos:3000",
+        "admin-freyr:3389",
+        "wings-04-private:22",
+        "wings-04-private:8080",
+        "wings-04-private:2022",
+        "10.10.10.20:3389"
+      ],
+      "deny": [
+        "pos:2375",
+        "10.10.10.20:22",
+        "wings-04-private:2375"
+      ]
+    },
+    {
+      "src": "admin-freyr",
+      "proto": "tcp",
+      "accept": [
+        "thor:22",
+        "wings-04-private:22",
+        "wings-04-private:8080",
+        "pos:443",
+        "10.10.10.20:3389"
+      ],
+      "deny": [
+        "admin-laptop:22",
+        "pos:2375"
+      ]
+    },
+    {
+      "src": "pos",
+      "proto": "tcp",
+      "accept": [
+        "wings-04-private:8080",
+        "wings-04-private:9100",
+        "10.10.50.20:8080"
+      ],
+      "deny": [
+        "wings-04-private:22",
+        "wings-04-private:2022",
+        "10.10.10.20:3389",
+        "admin-laptop:22"
+      ]
+    },
+    {
+      "src": "optiplex",
+      "proto": "tcp",
+      "accept": [
+        "wings-04-private:8080",
+        "wings-04-private:9100"
+      ],
+      "deny": [
+        "wings-04-private:22",
+        "pos:6443",
+        "10.10.10.20:3389"
+      ]
+    },
+    {
+      "src": "thor",
+      "proto": "tcp",
+      "accept": [
+        "pos:8443"
+      ],
+      "deny": [
+        "pos:22",
+        "pos:6443",
+        "optiplex:443",
+        "admin-laptop:22",
+        "10.10.10.20:3389",
+        "pos:443",
+        "pos:80",
+        "optiplex:8443",
+        "pos:32443"
+      ]
+    },
+    {
+      "src": "tag:oci-router",
+      "proto": "tcp",
+      "accept": [
+        "pos:8443"
+      ],
+      "deny": [
+        "pos:22",
+        "optiplex:443",
+        "admin-laptop:22",
+        "10.10.10.20:3389",
+        "pos:443",
+        "pos:80",
+        "optiplex:8443",
+        "pos:32443"
+      ]
+    },
+    {
+      "src": "other-member-desktop",
+      "proto": "tcp",
+      "deny": [
+        "pos:22",
+        "pos:443",
+        "thor:22",
+        "wings-04-private:22",
+        "wings-04-private:8080",
+        "10.10.10.20:3389",
+        "admin-laptop:22"
+      ]
+    },
+    {
+      "src": "other-member-laptop",
+      "proto": "tcp",
+      "deny": [
+        "pos:22",
+        "pos:443",
+        "thor:22",
+        "wings-04-private:22",
+        "wings-04-private:8080",
+        "10.10.10.20:3389"
+      ]
+    },
+    {
+      "src": "owner-phone",
+      "proto": "tcp",
+      "deny": [
+        "pos:22",
+        "pos:6443",
+        "pos:3000",
+        "pos:8443",
+        "pos:32443",
+        "optiplex:22",
+        "wings-04-private:22",
+        "wings-04-private:2022",
+        "wings-04-private:9100",
+        "10.10.10.20:3389",
+        "admin-freyr:3389"
+      ],
+      "accept": [
+        "pos:80",
+        "pos:443",
+        "optiplex:443",
+        "wings-04-private:8080",
+        "10.10.50.216:8080"
+      ]
+    },
+    {
+      "src": "old-home-router",
+      "proto": "tcp",
+      "deny": [
+        "pos:22",
+        "wings-04-private:22",
+        "10.10.10.20:3389"
+      ]
+    },
+    {
+      "src": "admin-laptop",
+      "proto": "udp",
+      "accept": [
+        "pos:5353"
+      ],
+      "deny": [
+        "wings-04-private:8080",
+        "10.10.10.20:3389"
+      ]
+    },
+    {
+      "src": "other-member-desktop",
+      "proto": "udp",
+      "deny": [
+        "pos:5353",
+        "wings-04-private:8080"
+      ]
+    },
+    {
+      "src": "owner-phone",
+      "proto": "tcp",
+      "accept": [
+        "pos:53"
+      ],
+      "deny": [
+        "pos:22"
+      ]
+    },
+    {
+      "src": "owner-phone",
+      "proto": "udp",
+      "accept": [
+        "pos:53"
+      ],
+      "deny": [
+        "pos:5353",
+        "wings-04-private:8080"
+      ]
+    }
+  ],
+  "tagOwners": {
+    "tag:oci-router": [
+      "group:homelab-owner"
+    ]
+  }
+}

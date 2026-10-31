@@ -1,0 +1,28 @@
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: oci-wings
+  labels:
+    kubernetes.io/service-name: oci-wings
+    endpointslice.kubernetes.io/managed-by: homelab-repository
+addressType: IPv4
+ports:
+- name: metrics
+  protocol: TCP
+  port: 9100
+endpoints:
+- addresses:
+  - 10.10.50.216
+  hostname: wings-01
+  conditions:
+    ready: true
+- addresses:
+  - 10.10.50.146
+  hostname: wings-02
+  conditions:
+    ready: true
+- addresses:
+  - 10.10.50.10
+  hostname: wings-04
+  conditions:
+    ready: true

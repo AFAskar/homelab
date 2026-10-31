@@ -4,3 +4,30 @@
 pki/*.key
 pki/*.csr
 pki/*.srl
+
+# OCI infrastructure: local inputs, plans/state, raw discovery and guest secrets
+!oci/**/*.md
+oci/**/.terraform/
+oci/**/*.tfstate*
+oci/**/*.tfplan
+oci/**/*.tfvars
+oci/**/*.tfvars.json
+oci/**/backend.hcl
+oci/inventory/
+oci/ansible/inventory.yaml
+oci/ansible/secrets/
+oci/ansible/collections/
+oci/windows/work/
+oci/**/*.qcow2
+oci/**/*.vmdk
+oci/**/*.vhd*
+oci/**/*.iso
+**/__pycache__/
+
+# Generated OCI reports belong in the private inventory, never in source docs
+oci/docs/*.json
+
+# AdGuard desired settings are committed only in SOPS-encrypted form
+docker/adguardhome/AdGuardHome.yaml
+docker/adguardhome/work/
+docker/adguardhome/*.plain*.yaml

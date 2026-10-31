@@ -1,0 +1,21 @@
+wings_version: v1.0.0-rc.1
+wings_checksums:
+  amd64: 19dda386e02041da1f1fbcc73f34e4bb01c1fbc2d499aac79a6be3a51ba7f0e8
+  arm64: ed7deafe0aef2acd3adae73103d2a01b57e8a7eaa56950194bdff11f87f37ff3
+wings_new_data_volume: false
+wings_initialize_empty_volume: false
+retained_data_reviewed: false
+wings_data_device: /dev/oracleoci/oraclevdb
+wings_data_mount: /srv/pelican
+wings_data_size_gb: 200
+# Enable only after OCI expanded the identified whole-disk ext4 volume.
+wings_expand_filesystem: false
+wings_public_interface: REPLACE_DISCOVERED_INTERFACE
+# Conntrack accepts first:last ranges, keeping one rule per protocol.
+wings_game_tcp_ports: ["25565:25765"]
+wings_game_udp_ports: ["25565:25765"]
+private_access_verified: false
+# Deliberately false: installing firewall lockdown before route verification
+# would destroy the last working access path.
+apply_private_firewall: false
+# Router must retain a scoped rule for its own private-IP SSH on tailscale0.

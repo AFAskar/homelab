@@ -1,0 +1,22 @@
+[Unit]
+Description=Pelican Wings
+After=docker.service network-online.target
+Requires=docker.service
+PartOf=docker.service
+{% if wings_new_data_volume %}
+RequiresMountsFor={{ wings_data_mount }}
+{% endif %}
+StartLimitIntervalSec=180
+StartLimitBurst=30
+[Service]
+User=root
+WorkingDirectory=/etc/pelican
+RuntimeDirectory=wings
+ExecStart=/usr/local/bin/wings --config /etc/pelican/config.yml
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+[Install]
+WantedBy=multi-user.target

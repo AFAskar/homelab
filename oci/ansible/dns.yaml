@@ -1,0 +1,4 @@
+# One authoritative DNS deployment; OCI records derive from the tracked
+# EndpointSlice refreshed by render-inventory.py, not independent live edits.
+- name: Reconcile DNS through the complete homelab AdGuard deployment
+  ansible.builtin.import_playbook: ../../docker/adguardhome/deploy.yaml
