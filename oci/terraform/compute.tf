@@ -5,8 +5,8 @@ resource "oci_core_instance" "wings" {
   display_name        = each.key
   shape               = "VM.Standard.E6.Flex"
   shape_config {
-    ocpus         = 2
-    memory_in_gbs = 16
+    ocpus         = each.value.ocpus
+    memory_in_gbs = each.value.memory_gb
   }
   create_vnic_details {
     subnet_id        = var.wings_subnet_ocid
@@ -30,7 +30,8 @@ resource "oci_core_instance" "wings" {
   preserve_boot_volume = true
   freeform_tags        = local.tags
   depends_on           = [terraform_data.review_gate, terraform_data.network_gate]
-  lifecycle { prevent_destroy = true }
+  # Restore this guard after the reviewed wings-03 retirement apply.
+  lifecycle { prevent_destroy = false }
 }
 
 # Import first. Freeze launch-time fields until a reviewed, zero-replacement plan.

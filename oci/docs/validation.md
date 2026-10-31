@@ -78,7 +78,7 @@ python3 oci/scripts/check-games.py
 ```
 
 Require Synced/Healthy applications, Ready certificates, a Bound retained PVC,
-and running queue/scheduler processes. In Panel, check all four nodes and a
+and running queue/scheduler processes. In Panel, check all active nodes and a
 browser console/WebSocket round trip. Test each game's actual public protocol
 and an external game client where applicable. The supplied game probe checks
 Mindustry TCP/UDP discovery and public-admin port denial; adapt probes for

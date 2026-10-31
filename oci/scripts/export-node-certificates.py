@@ -10,7 +10,9 @@ import tempfile
 root = Path(__file__).resolve().parents[2]
 destination = root / 'oci/ansible/secrets'
 ca = root / 'pki/homelab-root-ca.crt'
-nodes = [(f'wings-{n:02}', f'wings-{n:02}.oci.home.internal') for n in range(1, 5)]
+instances = json.loads(subprocess.check_output(
+    ['terraform', '-chdir=' + str(root / 'oci/terraform'), 'output', '-json', 'wings_instances']))
+nodes = [(name, name + '.oci.home.internal') for name in sorted(instances)]
 nodes.append(('panel-proxy', 'pelican.home.internal'))
 os.umask(0o077)
 

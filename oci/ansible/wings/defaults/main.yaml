@@ -7,6 +7,9 @@ wings_initialize_empty_volume: false
 retained_data_reviewed: false
 wings_data_device: /dev/oracleoci/oraclevdb
 wings_data_mount: /srv/pelican
+wings_data_size_gb: 200
+# Enable only after OCI expanded the identified whole-disk ext4 volume.
+wings_expand_filesystem: false
 wings_public_interface: REPLACE_DISCOVERED_INTERFACE
 # Conntrack accepts first:last ranges, keeping one rule per protocol.
 wings_game_tcp_ports: ["25565:25765"]

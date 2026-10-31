@@ -23,3 +23,8 @@ output "windows_image_bucket" {
     name      = oci_objectstorage_bucket.windows_images.name
   }
 }
+
+output "wings_capacity" {
+  description = "Desired paid-node capacity for provisioning, Panel limits and cost estimates."
+  value       = local.paid_wings
+}

@@ -3,10 +3,11 @@ resource "oci_core_volume" "wings" {
   compartment_id      = var.compartment_ocid
   availability_domain = var.availability_domain
   display_name        = "${each.key}-data"
-  size_in_gbs         = 200
+  size_in_gbs         = each.value.data_gb
   vpus_per_gb         = 10
   freeform_tags       = local.tags
-  lifecycle { prevent_destroy = true }
+  # Restore this guard after the reviewed wings-03 retirement apply.
+  lifecycle { prevent_destroy = false }
 }
 resource "oci_core_volume_attachment" "wings" {
   for_each        = local.paid_wings

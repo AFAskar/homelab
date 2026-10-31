@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enroll the four Terraform-managed nodes in the pinned Panel release.
+"""Enroll the Terraform-managed nodes in the pinned Panel release.
 
 Uses the same validated models/user service as that release's artisan commands.
 Passwords and generated Wings tokens travel over kubectl stdin/stdout, never argv.
@@ -88,21 +88,25 @@ else:
 nodes = json.loads(run(
     ['terraform', '-chdir=' + str(root / 'oci/terraform'), 'output', '-json', 'wings_instances'],
     capture_output=True, check=True).stdout)
-if set(nodes) != {f'wings-{n:02}' for n in range(1, 5)}:
-    raise SystemExit('Expected exactly four Terraform-managed Wings identities.')
+capacity = json.loads(run(
+    ['terraform', '-chdir=' + str(root / 'oci/terraform'), 'output', '-json', 'wings_capacity'],
+    capture_output=True, check=True).stdout)
+if set(nodes) != set(capacity) | {'wings-04'}:
+    raise SystemExit('Instance identities and desired paid-node capacity differ.')
 for name, instance in sorted(nodes.items()):
     retained = name == 'wings-04'
     desired = {'name': name, 'fqdn': name + '.oci.home.internal', 'scheme': 'https',
                'public': True, 'behind_proxy': False, 'maintenance_mode': False,
-               'memory': 20480 if retained else 14336, 'memory_overallocate': 0,
-               'disk': 81920 if retained else 184320, 'disk_overallocate': 0,
-               'cpu': 400, 'cpu_overallocate': 0, 'upload_size': 256,
+               'memory': 20480 if retained else (capacity[name]['memory_gb'] - 2) * 1024, 'memory_overallocate': 0,
+               'disk': 81920 if retained else int(capacity[name]['data_gb'] * 0.9) * 1024, 'disk_overallocate': 0,
+               'cpu': 400 if retained else capacity[name]['ocpus'] * 200, 'cpu_overallocate': 0, 'upload_size': 256,
                'daemon_base': '/var/lib/pelican/volumes' if retained else '/srv/pelican/volumes',
                'daemon_listen': 8080, 'daemon_connect': 8080, 'daemon_sftp': 2022}
     config = panel(
         '$n=App\\Models\\Node::firstOrCreate(["name"=>$data["node"]["name"]],$data["node"]); '
         'foreach(["fqdn","scheme","daemon_base"] as $k){ '
         'if($n->$k!==$data["node"][$k]) throw new RuntimeException("Existing node differs: ".$k); } '
+        '$n->update(collect($data["node"])->only(["memory","disk","cpu"])->all()); '
         # Approved inclusive pool: 201 allocations per node, including existing 25565.
         'foreach(range(25565,25765) as $port){ '
         'App\\Models\\Allocation::firstOrCreate(["node_id"=>$n->id,"ip"=>$data["ip"],"port"=>$port],'

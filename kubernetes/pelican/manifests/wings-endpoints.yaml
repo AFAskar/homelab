@@ -22,11 +22,6 @@ endpoints:
   conditions:
     ready: true
 - addresses:
-  - 10.10.50.99
-  hostname: wings-03
-  conditions:
-    ready: true
-- addresses:
   - 10.10.50.10
   hostname: wings-04
   conditions:

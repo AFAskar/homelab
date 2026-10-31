@@ -5,7 +5,7 @@ flowchart LR
   Admin[Administrator on existing tailnet] -->|Private SSH / RDP / browser TLS| Router[Thor / wings-04\nA1 ARM64 + Tailscale subnet router]
   K3S[Existing pos + optiplex\naccept routes + scoped pod SNAT] -->|Tailnet then OCI subnet routing| Router
   K3S --> Panel[Traefik + homelab CA TLS\nPelican Panel + SQLite PVC]
-  Router -->|SNAT source 10.10.50.10| Wings[10.10.50.0/24\nwings-01..03 E6 + wings-04 A1]
+  Router -->|SNAT source 10.10.50.10| Wings[10.10.50.0/24\nwings-01..02 E6 + wings-04 A1]
   Router -->|SNAT, private RDP| Win[10.10.10.0/24\nwin11-lab E4 / normally stopped]
   Players[Internet game clients] -->|IGW / public IPv4 / TCP+UDP 25565–25765| Wings
   Wings -->|TLS callback proxy on router private :443| Router
@@ -15,11 +15,12 @@ flowchart LR
 
 | Node | Shape | CPU / RAM | Boot / data | Architecture |
 |---|---|---|---|---|
-| wings-01..03 each | VM.Standard.E6.Flex | 2 / 16 GB | 50 / 200 GB | x86-64 Ubuntu 26.04 |
+| wings-01 | VM.Standard.E6.Flex | 4 / 32 GB | 50 / 400 GB | x86-64 Ubuntu 26.04 |
+| wings-02 | VM.Standard.E6.Flex | 2 / 16 GB | 50 / 200 GB | x86-64 Ubuntu 26.04 |
 | wings-04 (existing Thor) | VM.Standard.A1.Flex | existing 4 / 24 GB | existing 100 / none separate | ARM64 Ubuntu 26.04 Minimal |
 | win11-lab | VM.Standard.E4.Flex | 2 / 16 GB | 100 / none | Windows 11 x86-64; blocked pending supported image+TPM path |
 
-Paid storage is exactly 850 GB; Thor's 100 GB is separate. All disks stay at the selected 10 VPU balanced tier. Prevent-destroy protects compute/volumes/network; ignored imported launch fields preserve actual settings. This preservation phase intentionally avoids changing Thor's OCI/guest hostname; use `wings-04` in Panel and inventory.
+Paid storage is 800 GB including Windows (700 GB Linux); Thor's 100 GB is separate. All disks stay at the selected 10 VPU balanced tier. Prevent-destroy protects retained Always Free resources and shared network; ignored imported launch fields preserve actual settings. This preservation phase intentionally avoids changing Thor's OCI/guest hostname; use `wings-04` in Panel and inventory.
 
 ## Routing and sources
 
@@ -33,7 +34,7 @@ Wings on non-router nodes needs callbacks to Panel but has no Tailscale client. 
 
 ## TLS, browsers and game ports
 
-Panel: `https://pelican.home.internal`, ingress TLS from existing `homelab-ca`. Wings: `wings-01.oci.home.internal` through `wings-04.oci.home.internal`, HTTPS 8080 with per-node SAN certificates from the same CA. Browsers use those private FQDNs for websocket console/file features, so administrators need approved routes, DNS and CA trust too. Panel's image gets a combined CA bundle, with a ConfigMap generated directly from `pki/homelab-root-ca.crt` through the shared `pki/` Kustomize base. There is one CA certificate source; no copied certificate to maintain.
+Panel: `https://pelican.home.internal`, ingress TLS from existing `homelab-ca`. Wings: `wings-01.oci.home.internal`, `wings-02.oci.home.internal` and `wings-04.oci.home.internal`, HTTPS 8080 with per-node SAN certificates from the same CA. Browsers use those private FQDNs for websocket console/file features, so administrators need approved routes, DNS and CA trust too. Panel's image gets a combined CA bundle, with a ConfigMap generated directly from `pki/homelab-root-ca.crt` through the shared `pki/` Kustomize base. There is one CA certificate source; no copied certificate to maintain.
 
 API, SSH, SFTP (2022) and node-exporter (9100) are private. No public Wings API is needed in this topology. The approved TCP/UDP 25565–25765 pool is available independently on every node (201 port numbers inclusive); each game takes free Panel allocations within that pool. Configure allocations using each node's actual private bind IP; OCI public IPv4 NAT forwards to it. Additional games inside the pool need free Panel allocations and their matching game configuration; ports outside the pool still need explicit Terraform and Ansible changes. Docker forwarding is filtered in DOCKER-USER; UFW alone would not cover published game ports. IPv6 administration is blocked by host rules and no public IPv6 ingress is provisioned.
 

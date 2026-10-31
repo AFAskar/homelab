@@ -5,6 +5,7 @@ import yaml
 root = pathlib.Path(__file__).resolve().parents[1]
 d = json.loads(subprocess.check_output(['terraform', '-chdir='+str(root/'terraform'), 'output', '-json']))
 get = lambda k: d[k]['value']
+capacity = get('wings_capacity')
 inv = yaml.safe_load((root/'ansible/inventory.example.yaml').read_text())
 net = get('network')
 router = str(ipaddress.IPv4Address(net['router_private_ip']))
@@ -18,6 +19,8 @@ lines = []
 for name, v in get('wings_instances').items():
     ip = str(ipaddress.IPv4Address(v['private_ip']))
     children['wings']['hosts'][name]['ansible_host'] = ip
+    if name in capacity:
+        children['wings']['hosts'][name]['wings_data_size_gb'] = capacity[name]['data_gb']
     lines.append(f'{ip} {name}.oci.home.internal')
 children['subnet_routers']['hosts']['wings-04']['tailscale_routes'] = routes
 children['homelab']['vars']['oci_subnet_cidrs'] = routes
@@ -26,6 +29,12 @@ path=root/'ansible/inventory.yaml'
 if path.exists():
     existing = yaml.safe_load(path.read_text())
     current = existing['all']['children']
+    hosts = current['wings']['hosts']
+    for name in list(hosts):
+        if name not in get('wings_instances'):
+            del hosts[name]
+    for name, node in capacity.items():
+        hosts[name]['wings_data_size_gb'] = node['data_gb']
     for group in ['subnet_routers', 'thor_bootstrap']:
         for host in current.get(group, {}).get('hosts', {}).values():
             host['tailscale_routes'] = routes

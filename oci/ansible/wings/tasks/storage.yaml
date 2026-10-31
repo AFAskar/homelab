@@ -3,16 +3,22 @@
     argv: [readlink, -e, "{{ wings_data_device }}"]
   register: data_device
   changed_when: false
+- name: Rescan the identified block device after an approved OCI expansion
+  ansible.builtin.command:
+    argv: [tee, "/sys/class/block/{{ data_device.stdout | basename }}/device/rescan"]
+    stdin: '1'
+  changed_when: false
+  when: wings_expand_filesystem
 - name: Reject boot disks, partitions, and unexpected volume size
   ansible.builtin.command:
     argv: [lsblk, -bdno, "SIZE,TYPE,MOUNTPOINTS", "{{ data_device.stdout }}"]
   register: disk_identity
   changed_when: false
-- name: Require the exact unused 200 GB OCI data disk before initialization
+- name: Require the expected unused OCI data disk before initialization
   ansible.builtin.assert:
     that:
-      - disk_identity.stdout.split()[0] | int >= 200000000000
-      - disk_identity.stdout.split()[0] | int <= 214748364800
+      - disk_identity.stdout.split()[0] | int >= (wings_data_size_gb | int) * 1000000000
+      - disk_identity.stdout.split()[0] | int <= (wings_data_size_gb | int) * 1073741824
       - disk_identity.stdout.split()[1] == 'disk'
   when: wings_initialize_empty_volume
 - name: Read existing filesystem signature without modifying disk
@@ -69,3 +75,19 @@
     state: mounted
 # No Docker data-root migration on an existing node. Panel-generated config MUST
 # put paid game data in /srv/pelican/volumes. Service requires that mount.
+
+- name: Require the expected whole-disk ext4 volume before expansion
+  ansible.builtin.assert:
+    that:
+      - data_signature.stdout == 'ext4'
+      - disk_identity.stdout.split()[1] == 'disk'
+      - disk_identity.stdout.split()[0] | int >= (wings_data_size_gb | int) * 1000000000
+      - disk_identity.stdout.split()[0] | int <= (wings_data_size_gb | int) * 1073741824
+  when: wings_expand_filesystem
+- name: Grow the existing ext4 filesystem without formatting or changing its UUID
+  community.general.filesystem:
+    dev: "{{ data_device.stdout }}"
+    fstype: ext4
+    resizefs: true
+    force: false
+  when: wings_expand_filesystem

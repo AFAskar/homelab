@@ -4,6 +4,7 @@ from pathlib import Path
 D = decimal.Decimal
 BILLING_PERIOD_HOURS = 730 # Full-month storage and runtime projection basis.
 p = argparse.ArgumentParser()
+p.add_argument('--capacity-json', help='Private JSON exported from terraform output -json wings_capacity; defaults to committed desired capacity')
 p.add_argument('--hours', type=int, default=730)
 p.add_argument('--windows-hours', type=int, default=120)
 p.add_argument('--image-gb', type=int, default=0, help='Measured custom image GB; unknown is zero, report separately')
@@ -15,6 +16,10 @@ p.add_argument('--existing-charge-eur', type=D, default=D(0))
 p.add_argument('--extra-eur', type=D, default=D(0))
 p.add_argument('--output')
 a = p.parse_args()
+capacity = json.loads(Path(a.capacity_json).read_text()) if a.capacity_json else {
+ 'wings-01': {'ocpus': 4, 'memory_gb': 32, 'data_gb': 400},
+ 'wings-02': {'ocpus': 2, 'memory_gb': 16, 'data_gb': 200},
+}
 api = 'https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode='
 prices = {currency:json.load(urllib.request.urlopen(api+currency, timeout=60)) for currency in ['USD','EUR']}
 def rate(part, currency):
@@ -28,9 +33,10 @@ usd_per_eur=next(D(x.attrib['rate']) for x in fx.iter() if x.attrib.get('currenc
 def calculate(currency):
  r=lambda part:rate(part,currency)
  rows={}
- for n in range(1,4):
-  rows[f'wings-0{n} compute']=D(a.hours)*(2*r('B111129')+16*r('B111130'))
-  rows[f'wings-0{n} 250GB balanced']=250*(r('B91961')+10*r('B91962'))
+ for name, node in sorted(capacity.items()):
+  rows[f'{name} compute']=D(a.hours)*(D(node['ocpus'])*r('B111129')+D(node['memory_gb'])*r('B111130'))
+  size=50+node['data_gb']
+  rows[f'{name} {size}GB balanced']=size*(r('B91961')+10*r('B91962'))
  rows['win11 compute']=D(a.windows_hours)*(2*r('B93113')+16*r('B93114'))
  rows['win11 100GB balanced, including stopped hours']=100*(r('B91961')+10*r('B91962'))
  rows['50GB backups, no free allowance deducted']=50*r('B91628')

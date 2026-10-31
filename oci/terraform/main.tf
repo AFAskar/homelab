@@ -1,6 +1,9 @@
 locals {
-  tags         = { project = "homelab", managed_by = "terraform", service = "pelican" }
-  paid_wings   = toset(["wings-01", "wings-02", "wings-03"])
+  tags = { project = "homelab", managed_by = "terraform", service = "pelican" }
+  paid_wings = {
+    wings-01 = { ocpus = 4, memory_gb = 32, data_gb = 400 }
+    wings-02 = { ocpus = 2, memory_gb = 16, data_gb = 200 }
+  }
   router_cidrs = toset([for ip in setunion(toset([var.router_private_ip]), var.extra_router_private_ips) : "${ip}/32"])
 }
 data "oci_objectstorage_namespace" "this" { compartment_id = var.tenancy_ocid }

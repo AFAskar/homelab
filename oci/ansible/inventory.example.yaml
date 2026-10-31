@@ -22,11 +22,8 @@ all:
           ansible_host: REPLACE_PRIVATE_IP
           wings_new_data_volume: true
           wings_initialize_empty_volume: false # explicitly authorize the identified blank new disk
+          wings_data_size_gb: 400
         wings-02:
-          ansible_host: REPLACE_PRIVATE_IP
-          wings_new_data_volume: true
-          wings_initialize_empty_volume: false
-        wings-03:
           ansible_host: REPLACE_PRIVATE_IP
           wings_new_data_volume: true
           wings_initialize_empty_volume: false
