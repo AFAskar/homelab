@@ -209,6 +209,10 @@
           {{ not adguard_config_stat.stat.exists or
              (adguard_existing.content | default('') | b64decode | from_yaml) != adguard_desired }}
       no_log: true
+    - name: Verify Tailscale readiness before changing the resolver
+      ansible.builtin.command:
+        argv: [/usr/bin/tailscale, wait, --timeout=60s]
+      changed_when: false
     - name: Reconcile the dedicated systemd service
       block:
         - name: Retire the Compose restart policy before migration
