@@ -25,6 +25,10 @@ output "windows_image_bucket" {
 }
 
 output "wings_capacity" {
-  description = "Desired paid-node capacity for provisioning, Panel limits and cost estimates."
-  value       = local.paid_wings
+  description = "Managed paid-node capacity for provisioning, Panel limits and cost estimates."
+  value = { for name, node in oci_core_instance.wings : name => {
+    ocpus     = node.shape_config[0].ocpus
+    memory_gb = node.shape_config[0].memory_in_gbs
+    data_gb   = tonumber(oci_core_volume.wings[name].size_in_gbs)
+  } }
 }
