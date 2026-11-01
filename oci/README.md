@@ -1,90 +1,72 @@
-# OCI Pelican infrastructure
+# OCI game nodes and nested Windows lab
 
-Terraform manages OCI compute, storage, networking and the tailnet policy.
-Ansible configures Wings, subnet routing and host services; Argo CD manages
-Pelican Panel in the existing Kubernetes cluster. Start with the
-[inventory](docs/existing-infrastructure.md), [deployment sequence](docs/migration.md),
-[cost model](docs/costs.md) and [acceptance checks](docs/validation.md).
+Manage three Ubuntu 26.04 LTS hosts with one Terraform root at `oci/terraform/`:
 
-One Terraform root lives in `oci/terraform/`. It preserves Thor as logical `wings-04`, its 100 GB boot disk, and the existing Jotunheim network. Two paid E6 nodes use 50 GB boot disks: wings-01 has 4 OCPUs, 32 GB RAM and 400 GB data; wings-02 has 2 OCPUs, 16 GB RAM and 200 GB data. Windows is a required E4 instance (2 OCPUs, 16 GB RAM, 100 GB boot), guarded against deployment without verified Windows 11 compatibility. No other paid router or new network is introduced.
+| Host | Shape / architecture | OCPUs / RAM | Boot / data |
+|---|---|---|---|
+| wings-01 | E6.Flex / amd64 | 4 / 32 GB | 50 / 400 GB |
+| wings-02 | E6.Flex / amd64 | 2 / 34 GB | 50 / 200 GB |
+| wings-04 / Thor | Existing A1 / arm64 | 4 / 24 GB | Existing 100 GB |
 
-Generated inventory, billing/pricing snapshots, cost estimates and validation reports stay in ignored `oci/inventory/reports/`, with private permissions. They are local run artifacts, not source configuration. Keep dated findings and their limits in Markdown; rerun discovery/planning/checks before deployment instead of trusting an old report. Checked-in JSON is reserved for declarative inputs such as image capabilities and game eggs.
+Pelican Panel runs in the existing homelab Kubernetes cluster. All hosts run Wings continuously. Wings-02 also runs KVM/libvirt for on-demand Windows guests; no fourth OCI instance is needed. Windows disks, firmware variables, TPM state and saved RAM live under `/srv/pelican/lab` on the existing data volume. A guest start/save never stops or reboots the Linux host.
 
-The public game pool is **25565–25765 inclusive, TCP and UDP**, on each Wings node. This is 201 port numbers per node. Select free allocations in Panel when creating a game; network changes are needed only outside that pool. Administrative services remain private. See [game operations](docs/operations.md).
+The native OCI Windows-image workflow is not needed for nested guests. Existing imported-image/source objects remain private and retained; do not delete them without reviewing recovery needs and obtaining cleanup approval. The original MPMB VM is preserved.
 
-## Tooling and authentication
+## Terraform and preservation
 
-Use Terraform 1.12+ (OCI backend locking), OCI provider 9.11.0 and Tailscale provider 0.29.3 (lockfile committed), OCI CLI, Python 3 with `oci` and `PyYAML`, Ansible with the pinned collections, kubectl, Kustomize/KSOPS 4.5.1, SOPS and age. `oci setup config` configures the default API-key profile; keep `~/.oci` and its private key readable only by you. The profile needs read access to identity, compute, networks, volumes, images, limits, budgets, usage and storage. Deployment additionally needs their create/update rights in Ymir. API tests do not prove all write permissions. Do not commit keys, raw discovery, plans, state, tfvars, images or Wings tokens.
+1. Configure an OCI CLI/API-key profile and install the pinned Terraform/provider versions from `terraform/versions.tf`. Inspect the tenancy with `scripts/inventory.sh` before changing retained resources.
+2. Copy `terraform/terraform.tfvars.example` only when a private variable file does not already exist. Reconcile discovered OCIDs, SSH public key, recipients and EUR billing currency. Never put private keys, OAuth secrets or Windows passwords in Terraform variables/user-data.
+3. Follow [migration](docs/migration.md) for the existing private versioned backend, imports, state access and the Always Free preservation checks. Import shared resources before updating them; reject unintended replacement. Keep backend configuration, state, plans and raw inventory private.
+4. Load the existing Tailscale OAuth credential by file reference and validate the complete root:
 
 ```bash
-export OCI_TENANCY_OCID=... # profile tenancy OCID
-oci/scripts/inventory.sh
-test -e oci/terraform/terraform.tfvars || cp oci/terraform/terraform.tfvars.example oci/terraform/terraform.tfvars
-test -e oci/terraform/backend.hcl || cp oci/terraform/backend.hcl.example oci/terraform/backend.hcl
-terraform -chdir=oci/terraform init -backend-config=backend.hcl
+export TAILSCALE_OAUTH_CLIENT_ID=file:$PWD/oci/ansible/secrets/tailscale-client-id
+export TAILSCALE_OAUTH_CLIENT_SECRET=file:$PWD/oci/ansible/secrets/tailscale-client-secret
+terraform -chdir=oci/terraform init -lockfile=readonly
 terraform -chdir=oci/terraform fmt -check
 terraform -chdir=oci/terraform validate
-terraform -chdir=oci/terraform plan -out=review.tfplan
-terraform -chdir=oci/terraform show -json review.tfplan | python3 oci/scripts/check-plan.py
+umask 077
+terraform -chdir=oci/terraform plan -out=../inventory/review.tfplan
 ```
 
-Use the private, versioned `homelab-tfstate` bucket for the backend. For recreation, supply an approved private versioned bucket before initializing the root. State is encrypted at rest by OCI. Use a dedicated bucket with bucket-scoped IAM, no public/PAR access, versioning, audit logging, and backend locks. Never share plan/state artifacts publicly. Bucket policy needs `OBJECT_INSPECT`, `OBJECT_READ`, `OBJECT_CREATE`, `OBJECT_DELETE` for the state and lock objects; separate administrators manage the bucket. Do not disable locking or force-unlock another writer. No credentials belong in `backend.hcl`; backend configuration itself is cached under `.terraform`.
+Review actual actions, pricing and access dependencies before an approved apply. Never merge or delete unrelated resources as an implicit deployment step. Preserve Thor's shape, storage and working access.
 
-Example policy, replace group/compartment/bucket names:
+## Configure hosts and Panel
 
-```text
-Allow group HomelabTerraform to manage objects in compartment Ymir where target.bucket.name = 'homelab-tfstate'
-Allow group HomelabTerraform to read buckets in compartment Ymir where target.bucket.name = 'homelab-tfstate'
-Allow group HomelabTerraform to read buckets in compartment Ymir where target.bucket.name = 'homelab-win11-images'
-Allow group HomelabTerraform to {OBJECT_CREATE, OBJECT_OVERWRITE, OBJECT_INSPECT, OBJECT_READ} in compartment Ymir where target.bucket.name = 'homelab-win11-images'
-```
+Run Ansible from `oci/ansible/` with the existing collection requirements and private `inventory.yaml`. `python3 oci/scripts/render-inventory.py` refreshes operator inventory and monitoring targets from Terraform outputs; review before deployment.
 
-The image grant supports hash/object inspection, multipart upload and image-source reading without object-deletion permission. OCI requires OBJECT_CREATE and OBJECT_OVERWRITE for multipart parts, and BUCKET_READ plus OBJECT_READ to commit them; see the [official operation permissions](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/objectstoragepolicyreference.htm). CLI `--no-overwrite` and the digest guard still protect the selected source object. Bucket creation/management and Compute image import require separate compartment-scoped rights; this example covers storage objects, not a complete Terraform deployment role.
+- `bootstrap-router.yaml` and `homelab-routes.yaml` establish the private subnet-router/pod path. Approve only required routes; retain the last working administrative listener until private access is tested.
+- `dns.yaml` imports the [rootless AdGuard Quadlet deployment](../docs/dns-adguardhome.md).
+- `callback-firewall.yaml` and `tailscale/panel-proxy.yaml` isolate cloud callbacks from shared homelab web services. Follow [callback security](docs/callback-security.md) in order.
+- Sync the existing Argo applications manually. Panel uses `kubernetes/pelican/manifests`, the existing homelab CA and encrypted secrets. Run `python3 oci/scripts/export-node-certificates.py` and `python3 oci/scripts/configure-panel.py --initialize --admin-email YOUR_ADMIN_EMAIL` from the repository root. Existing users, passwords and node tokens are preserved.
+- Run `ansible-playbook site.yaml` for Wings and the router. Never authorize filesystem initialization on an existing volume.
+- Run `ansible-playbook lab.yaml` to configure nested KVM on wings-02. This reuses the existing data mount and adds only bridge-scoped firewall chains alongside Docker/Wings.
 
-The state bucket is a bootstrap prerequisite outside this root so it survives infrastructure teardown. Reuse an approved existing bucket if available. Backup-bucket access belongs to a separate bucket-scoped writer/restore-reader identity, not public access keys or tenancy-wide credentials on Wings.
+Panel budgets on wings-02 reserve 4 GiB for the host and 16 GiB for a Windows guest, leaving 14 GiB for Wings. It reserves 120 GiB of the existing data volume for guest disks/checkpoints, leaving a 60 GiB Wings allocation budget. These are allocation budgets, not separate partitions; use real per-server limits and monitor free space. CPU is shared. The import/start tools reject insufficient space/RAM and never stop game servers to make room.
 
-## Tailnet policy as code
+## Send and run a Windows guest
 
-The same Terraform root manages the existing tailnet’s complete policy using `tailscale_acl.tailnet`, with `ansible/tailscale/policy.hujson` as its single reviewed source. Provider 0.29.3 validates syntax and embedded tests against the Tailscale API during planning. An import block reads the existing policy before proposing a change; creation without import is disabled. `prevent_destroy` and `reset_acl_on_destroy=false` protect against deleting ownership or restoring a default allow-all policy. Do not manage this same policy from a second root or an automatic console/GitOps writer.
-
-Bootstrap one OAuth trust credential in the existing tailnet with **Policy File read/write only**. Save its Client ID and secret in the ignored, owner-only `oci/ansible/secrets/tailscale-client-id` and `tailscale-client-secret` files (mode 0600), then configure the provider without putting secrets in Terraform inputs/state:
+Create bundles only in an ignored private directory. A plain QCOW2 is a cold-boot disk; preserving a desktop/RAM session requires its matching domain, disk, firmware/NVRAM, TPM state and compatible CPU/QEMU machine type.
 
 ```bash
-export TAILSCALE_OAUTH_CLIENT_ID="file:$PWD/oci/ansible/secrets/tailscale-client-id"
-export TAILSCALE_OAUTH_CLIENT_SECRET="file:$PWD/oci/ansible/secrets/tailscale-client-secret"
-terraform -chdir=oci/terraform plan -target=tailscale_acl.tailnet -out=policy-review.tfplan
+mkdir -p oci/windows/work/bundles
+# An existing libvirt guest must already be shut off:
+python3 oci/windows/guest-bundle.py export mpmb-windows11 oci/windows/work/bundles/mpmb
+# Or explicitly suspend/save it for transfer, leaving the source off:
+python3 oci/windows/guest-bundle.py export mpmb-windows11 oci/windows/work/bundles/mpmb-saved --save
+# For a prepared, offline QCOW2 without a saved session:
+python3 oci/windows/guest-bundle.py image /private/windows.qcow2 oci/windows/work/bundles/new-win --name win11-lab
+
+oci/scripts/send-guest.sh oci/windows/work/bundles/mpmb
+oci/scripts/start-windows.sh mpmb-windows11
+oci/scripts/status-windows.sh mpmb-windows11
+oci/scripts/stop-windows.sh mpmb-windows11
 ```
 
-Use the protected OCI backend before authoritative import/apply. An isolated targeted policy plan may be reviewed before the full OCI deployment is ready; this is a bootstrap exception, not the routine deployment workflow. An ACL plan is validation/review only. Obtain access-change approval before applying its policy update. The browser is used for initial credential bootstrap and recovery, not routine policy edits. Provider 0.29.3 has no ETag guard on policy updates; `overwrite_existing_content=false` protects creation only. Use one operator/writer at a time. Before a console recovery edit, stop pending applies and invalidate every saved plan containing this policy. Reconcile the recovery policy into Git and generate/review a fresh plan before resuming. Follow the recovery procedure in operations.md; never apply a pre-recovery plan. The restrictive policy is now applied live. Callback isolation tests explicitly deny Thor access to shared pos:443.
+Connect through Tailscale to the private address from `terraform output -json lab_host`, TCP/3389. Only one nested guest runs at a time behind this endpoint. Keep Secure Boot and TPM 2.0 enabled. Configure guest RDP/NLA and its firewall to permit the nested gateway `192.168.124.1`; retrieve credentials from your password manager, not Git. `windows/first-boot.ps1` can configure that scope from an elevated guest console with `-RouterPrivateIPs 192.168.124.1` and a securely supplied password.
 
-## Guest configuration and GitOps
+If an export fails after `--save`, keep the recovery file and resume the original with `virsh -c qemu:///session restore /private/bundle/state.save`; its original disk paths remain embedded in that checkpoint. Never delete the only saved RAM copy to resolve an export error.
 
-Cloud-init only bootstraps new Ubuntu instances. Follow this order after the applicable import/deployment approvals:
+RAM restore is conditional on compatibility. The tools fail rather than discarding the checkpoint or silently cold-booting. Source MPMB currently uses host-passthrough CPU; a common CPU profile is preferable for repeatable transfers, and a guest cold boot can be needed to establish it. No OCI image import, host reboot or new OCI VM is required for each guest. An exported saved session must remain paired with its captured disks; resuming the source and later reusing the RAM file with modified disks is unsafe.
 
-1. Prepare the existing router inventory before paid nodes exist:
-
-   ```bash
-   cd oci/ansible
-   ansible-galaxy collection install -r requirements.yaml
-   cp inventory.example.yaml inventory.yaml # only if no private inventory exists
-   python3 ../scripts/select-ssh-agent-key.py
-   ```
-
-   Review `thor_bootstrap` in the private inventory. Confirm the administrator can apply `tag:oci-router`, validate `tailscale/policy.hujson` as the replacement for allow-all (including router-to-pos TCP/8443), and verify recovery access **before tagging Thor**. After the access-change review/approval, set `enable_private_ssh_listener: true` for `thor-bootstrap`, then run `ansible-playbook bootstrap-router.yaml` over its existing tailnet address. Approve advertised subnet routes and verify private SSH; preserve the current tailnet listener.
-2. After paid nodes are provisioned through an approved plan, run `python3 ../scripts/render-inventory.py` to refresh DNS/monitoring targets and create an inventory if absent. It preserves any existing private inventory; reconcile instance addresses manually. Review actual subnet sources and run `ansible-playbook homelab-routes.yaml` to establish Kubernetes pod access, then `ansible-playbook dns.yaml` for the [complete AdGuard IaC deployment](../docs/dns-adguardhome.md), including the derived private node names and existing CoreDNS path.
-3. **Before syncing either the Traefik callback listener or Panel**, run `ansible-playbook callback-firewall.yaml` from `oci/ansible/` on both k3s hosts. Follow the reviewed [callback rollout sequence](docs/callback-security.md), then manually sync Argo application `pelican`. From the repository root run `python3 oci/scripts/export-node-certificates.py`, then `python3 oci/scripts/configure-panel.py --initialize --admin-email YOUR_ADMIN_EMAIL`. This initializes the configured SQLite schema, creates the administrator and the active node records through the pinned release’s validated models/services, exports private Wings configs and disables the installer. Existing administrator passwords and node tokens are preserved on reruns. The initial credential stays only in ignored `oci/ansible/secrets/panel-admin.json` (0600); move it to your password manager.
-4. After the dedicated listener and Panel are synced, prepare the proxy certificates and switch its upstream according to [callback isolation](docs/callback-security.md). The included cert-manager Certificates and export helper also provide the callback proxy’s separate leaf certificate/key at `secrets/panel-proxy/tls.crt` and `secrets/panel-proxy/tls.key`. Confirm `homelab_ca_local` points to the existing public root certificate. From `oci/ansible/`, run `ansible-playbook tailscale/panel-proxy.yaml`.
-5. Only after those Panel configs/certificates and callback access exist, run `ansible-playbook --syntax-check site.yaml` and `ansible-playbook site.yaml` to provision Wings. Verify enrollment, browser console and game access.
-
-Existing Thor data requires `retained_data_reviewed: true` after backup/review. New blank data disks require explicit `wings_initialize_empty_volume: true` after confirming attachment identity. Private firewall lockdown remains off until private access is verified. No existing data or Docker root is migrated automatically.
-
-Panel manifests live at `kubernetes/pelican/`, following the existing layout, CA, SOPS recipient and application-of-applications integration. Its Argo application has **manual sync**. Build with `kustomize build --enable-alpha-plugins --enable-exec kubernetes/pelican/manifests` using the authorized SOPS age key. The APP_KEY is encrypted to the existing repository recipient; protect its backup. Keep the installer private.
-
-[Operations](docs/operations.md) covers private TLS/DNS, enrollment, backups, monitoring, Windows tooling and recovery. [Architecture](docs/architecture.md) records network flows and ARM limitations. Billable deployment, cleanup and merge require explicit approval; a passing static check is not deployment approval.
-
-For Windows image preparation, use a separate MPMB checkpoint clone with
-`oci/windows/clone-checkpoint.py` and inspect it with `inspect-source.ps1`.
-Follow the [Windows rebuild procedure](docs/operations.md#windows-lifecycle)
-for signed drivers, sanitization, generalization and capture. Preserve the
-source VM. Keep the approved 100 GB boot allocation and verify actual imported
-image capabilities and regular Compute Secure Boot/TPM support before launch.
+Stopping Windows saves its RAM while the shared host/Wings stay running; it does not reduce OCI compute charges. Use the [operations guide](docs/operations.md), [acceptance checks](docs/validation.md), [architecture](docs/architecture.md), [inventory](docs/existing-infrastructure.md) and [cost model](docs/costs.md) for access, recovery, backups and spending.

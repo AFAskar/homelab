@@ -110,16 +110,12 @@ Test notification delivery separately from rule installation. Read usage and
 promotion balance with `spend-status.py`, compare with the cost model and
 check promotion expiry; budget notifications do not cap spending.
 
-## Windows acceptance
+## Nested guest acceptance
 
-Before launch, obtain technical confirmation for the exact regular E4 Windows
-11 custom-image/UEFI/Secure Boot/TPM configuration and review the imported
-image's boot minimum. Preserve the approved 2 OCPU/16 GB/100 GB allocation and
-security requirements. Image metadata acceptance or local QEMU tests do not
-establish OCI boot compatibility. Obtain launch approval for the saved plan.
+Verify wings-02 exposes `/dev/kvm`, AMD-V and a working KVM API before importing a guest. Run the role twice and require idempotence; confirm existing Wings/Docker services and public game rules are intact. Check Panel's reserved RAM/disk budgets against actual free capacity.
 
-After launch, check actual guest Secure Boot/TPM, private RDP/NLA, a rejected
-wrong-password attempt and the start/stop/status scripts. Recheck Terraform
-for unintended lifecycle changes, verify persistent boot storage, and leave
-the VM stopped after testing. Diagnose failure using private access or console
-recovery; never open public RDP or disable security requirements as a shortcut.
+Use an immutable private bundle with matching disk, XML, firmware, NVRAM, TPM and RAM. Test checksum rejection and a refused overwrite before a real import. For a saved-state transfer, check CPU/QEMU compatibility and actual restore success; a cold image boot is a different test and must not be reported as RAM migration.
+
+Inside Windows verify Secure Boot, TPM 2.0, RDP/NLA and the gateway-scoped firewall. From the approved tailnet path test RDP, including a rejected wrong-password attempt. Require direct public RDP/libvirt/VNC to fail. From the guest test public Internet access and denial of OCI metadata, homelab, tailnet and OCI private destinations.
+
+Save/resume the guest and verify its desktop and data survive while Wings and the Linux host keep running. Exercise a bundle transfer from the real source only after arranging any source suspension; never silently discard a checkpoint or reboot Windows when restore fails. Leave the test guest saved/off when finished.

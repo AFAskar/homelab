@@ -7,7 +7,7 @@ resource "oci_core_network_security_group" "wings" {
 resource "oci_core_network_security_group" "windows" {
   compartment_id = var.compartment_ocid
   vcn_id         = var.vcn_ocid
-  display_name   = "win11-private-rdp"
+  display_name   = "lab-private-rdp"
   freeform_tags  = local.tags
 }
 locals {

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# This host already runs Docker/Wings: touch only LAB-* chains and bridge-scoped jumps.
+set -euo pipefail
+uplink={{ ansible_facts.default_ipv4.interface | quote }}
+bridge={{ lab_bridge | quote }}
+host_ip={{ lab_private_ip | quote }}
+guest_ip={{ lab_guest_ip | quote }}
+guest_net={{ lab_guest_subnet | quote }}
+gateway={{ lab_gateway_ip | quote }}
+for chain in LAB-FORWARD LAB-INPUT; do
+  iptables -w -N "$chain" 2>/dev/null || true
+  iptables -w -F "$chain"
+done
+iptables -w -A LAB-INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -w -A LAB-INPUT -p udp --sport 68 --dport 67 -j ACCEPT
+for proto in tcp udp; do
+  iptables -w -A LAB-INPUT -s "$guest_net" -d "$gateway" -p "$proto" --dport 53 -j ACCEPT
+done
+iptables -w -A LAB-INPUT -j DROP
+iptables -w -A LAB-FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+{% for router in lab_router_sources %}
+iptables -w -A LAB-FORWARD -i "$uplink" -o "$bridge" -s {{ router | quote }} -d "$guest_ip" -p tcp --dport 3389 -j ACCEPT
+{% endfor %}
+for cidr in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4; do
+  iptables -w -A LAB-FORWARD -i "$bridge" -d "$cidr" -j DROP
+done
+iptables -w -A LAB-FORWARD -i "$bridge" -o "$uplink" -s "$guest_net" -j ACCEPT
+iptables -w -A LAB-FORWARD -j DROP
+# Reinsert our narrowly scoped jumps first after Docker changes its own base chains.
+while iptables -w -C INPUT -i "$bridge" -j LAB-INPUT 2>/dev/null; do iptables -w -D INPUT -i "$bridge" -j LAB-INPUT; done
+iptables -w -I INPUT 1 -i "$bridge" -j LAB-INPUT
+for direction in -i -o; do
+  while iptables -w -C FORWARD "$direction" "$bridge" -j LAB-FORWARD 2>/dev/null; do iptables -w -D FORWARD "$direction" "$bridge" -j LAB-FORWARD; done
+  iptables -w -I FORWARD 1 "$direction" "$bridge" -j LAB-FORWARD
+done
+for chain in LAB-PREROUTING LAB-POSTROUTING; do
+  iptables -w -t nat -N "$chain" 2>/dev/null || true
+  iptables -w -t nat -F "$chain"
+done
+{% for router in lab_router_sources %}
+iptables -w -t nat -A LAB-PREROUTING -i "$uplink" -s {{ router | quote }} -d "$host_ip" -p tcp --dport 3389 -j DNAT --to-destination "$guest_ip:3389"
+{% endfor %}
+iptables -w -t nat -A LAB-POSTROUTING -o "$bridge" -d "$guest_ip" -p tcp --dport 3389 -m conntrack --ctorigdst "$host_ip" --ctorigdstport 3389 -j SNAT --to-source "$gateway"
+iptables -w -t nat -A LAB-POSTROUTING -o "$uplink" -s "$guest_net" -j MASQUERADE
+for chain in PREROUTING POSTROUTING; do
+  while iptables -w -t nat -C "$chain" -j "LAB-$chain" 2>/dev/null; do iptables -w -t nat -D "$chain" -j "LAB-$chain"; done
+  iptables -w -t nat -I "$chain" 1 -j "LAB-$chain"
+done
+# Nested guests have no IPv6 administration/routing path.
+for chain in INPUT FORWARD; do
+  ip6tables -w -C "$chain" -i "$bridge" -j DROP 2>/dev/null || ip6tables -w -I "$chain" 1 -i "$bridge" -j DROP
+done
+ip6tables -w -C FORWARD -o "$bridge" -j DROP 2>/dev/null || ip6tables -w -I FORWARD 1 -o "$bridge" -j DROP

@@ -3,8 +3,14 @@ output "wings_instances" {
     "wings-04" = { id = oci_core_instance.wings_04.id, private_ip = oci_core_instance.wings_04.private_ip, public_ip = oci_core_instance.wings_04.public_ip, boot_volume_id = var.retained_boot_volume_ocid }
   })
 }
-output "windows_instance_id" { value = oci_core_instance.windows.id }
-output "windows_private_ip" { value = oci_core_instance.windows.private_ip }
+output "lab_host" {
+  description = "Nested KVM shares wings-02; guest lifecycle must never stop this host."
+  value = {
+    id                = oci_core_instance.wings["wings-02"].id
+    private_ip        = oci_core_instance.wings["wings-02"].private_ip
+    shared_with_wings = true
+  }
+}
 output "data_volumes" { value = { for k, v in oci_core_volume.wings : k => { id = v.id, device = oci_core_volume_attachment.wings[k].device } } }
 output "network" {
   value = { vcn_id = var.vcn_ocid, wings_subnet_id = var.wings_subnet_ocid, windows_subnet_id = var.windows_subnet_ocid, advertised_routes = distinct([data.oci_core_subnet.wings.cidr_block, data.oci_core_subnet.windows.cidr_block]), router_private_ip = var.router_private_ip }
@@ -27,8 +33,11 @@ output "windows_image_bucket" {
 output "wings_capacity" {
   description = "Managed paid-node capacity for provisioning, Panel limits and cost estimates."
   value = { for name, node in oci_core_instance.wings : name => {
-    ocpus     = node.shape_config[0].ocpus
-    memory_gb = node.shape_config[0].memory_in_gbs
-    data_gb   = tonumber(oci_core_volume.wings[name].size_in_gbs)
+    ocpus           = node.shape_config[0].ocpus
+    memory_gb       = node.shape_config[0].memory_in_gbs
+    data_gb         = tonumber(oci_core_volume.wings[name].size_in_gbs)
+    host_reserve_gb = name == "wings-02" ? 4 : 2
+    guest_memory_gb = name == "wings-02" ? 16 : 0
+    guest_disk_gb   = name == "wings-02" ? 120 : 0
   } }
 }

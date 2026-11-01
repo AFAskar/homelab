@@ -51,4 +51,4 @@ oci compute image-shape-compatibility-entry add --image-id "$image_id" --shape-n
 # and private RDP after the approved Terraform first launch. Open the gate only
 # after establishing a documented service-supported launch path and boot minimum.
 # Metadata acceptance alone cannot resolve the regular Compute custom-image
-# Secure Boot restriction. Keep windows_compatibility_verified=false meanwhile.
+# Secure Boot restriction. The shared nested-KVM backend does not use this image capability as a native-boot gate.

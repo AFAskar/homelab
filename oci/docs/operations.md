@@ -17,7 +17,7 @@ The policy source is `ansible/tailscale/policy.hujson`. Maintain the following s
 | Owner iPhone | Wings subnet | HTTPS Wings browser console and API endpoints TCP/8080 |
 | Both admin clients | pos tailnet/known LAN address | Kubernetes API 6443, AdGuard UI 3000, DNS TCP/UDP 5353 |
 | Both admin clients | 10.10.50.0/24 Wings subnet | SSH 22, Wings API 8080, SFTP 2022, metrics 9100 |
-| Both admin clients | 10.10.10.0/24 Windows subnet | TCP/3389 only |
+| Both admin clients | wings-02 private IP | TCP/3389 to the nested guest only |
 | pos + optiplex | Wings subnet and router tailnet address/tag | TCP/8080,9100 only |
 | Thor/router tag | pos tailnet address | TCP/8443, authenticated Panel daemon API only |
 | Other tailnet devices | Infrastructure | No grant; default denied |
@@ -62,7 +62,7 @@ python3 oci/scripts/configure-panel.py --initialize --admin-email YOUR_ADMIN_EMA
 
 Use `--initialize` on first setup or a reviewed schema update; it runs the release migrations and seeds without dropping tables. Ordinary reruns can omit it. The helper preserves existing administrator passwords, refuses to promote an existing non-admin account, preserves node tokens, checks existing node hostname/TLS/data paths, and saves secrets only in ignored mode-0600 files. Retrieve the bootstrap password privately from `oci/ansible/secrets/panel-admin.json` and store it in the password manager. It disables the web installer after initialization. The official image’s bundled queue worker and scheduler are reused; verify `queue-worker` and `supercronic` with `supervisorctl status`.
 
-The active private node names use HTTPS 8080 and SFTP 2022. Paid nodes reserve 2 GiB RAM and 10% disk headroom: wings-01 allows 30 GiB / 360 GiB and 800% CPU, wings-02 allows 14 GiB / 180 GiB and 400% CPU; Thor uses 20 GiB / 80 GiB of its existing capacity. Paid game data is `/srv/pelican/volumes`; Thor uses `/var/lib/pelican/volumes`. Root CA trust, per-node certificates and non-overlapping Docker networks remain prerequisites. Config export uses `/etc/pelican/tls/` and the private Panel URL. No enrollment token is committed.
+The active private node names use HTTPS 8080 and SFTP 2022. Paid nodes reserve 2 GiB RAM and 10% disk headroom: wings-01 allows 30 GiB / 360 GiB and 800% CPU, wings-02 allows 14 GiB / 60 GiB and 400% shared CPU after reserving Windows/host capacity; Thor uses 20 GiB / 80 GiB of its existing capacity. Paid game data is `/srv/pelican/volumes`; Thor uses `/var/lib/pelican/volumes`. Root CA trust, per-node certificates and non-overlapping Docker networks remain prerequisites. Config export uses `/etc/pelican/tls/` and the private Panel URL. No enrollment token is committed.
 
 The approved public game pool is **25565–25765 inclusive**, TCP and UDP, on every Wings node: 201 port numbers per node. `configure-panel.py` idempotently reserves that pool using each node's actual private VNIC IP, preserving occupied allocations. The existing acceptance game uses 25565; the other 200 allocations per node start free. OCI public IP is external NAT, not the Linux bind address. Store mappings from Panel allocation to public endpoint; ephemeral paid public IPs may change on replacement. For a new game inside this pool, select free primary/additional allocations in Panel, choose a compatible egg/runtime and resource limits, then install/start it. No further OCI or host-firewall change is needed for ports within the pool. Games needing ports outside it require a reviewed Terraform/Ansible update. The pool is available on every active node; do not use its public ports for RCON or other administrative listeners. Port numbers may be reused on different nodes, but two servers cannot own the same node/IP/port allocation. SSH/RDP/API/exporter/SFTP stay private. Verify public games using an external client independent of the tailnet. Check native ARM manifest/egg for Thor; x86-only games belong on paid AMD nodes.
 
@@ -90,19 +90,26 @@ Restore into a **new empty staging directory**: download the named object with `
 
 Paid game data survives reboot through an ext4 UUID mount. Wings RequiresMountsFor prevents accidental use of an unmounted boot directory. Compute/volume prevent_destroy guards against accidental Terraform destruction; preservation imports do not relocate existing Thor data. Rebuilding a paid node requires a reviewed instance-only replacement while preserving data/boot disks, then reattachment and UUID remount; do not remove protection or recreate disks blindly. Reuse discovered filesystems and never format an existing disk. Full disaster recreation requires network import/state recovery first and a confirmed Windows image workflow; imported freeze rules must be reconciled before claiming a complete greenfield recreation.
 
-## Windows lifecycle
+## Nested Windows lifecycle on wings-02
 
-No Windows instance exists in OCI. The local 80 GiB MPMB checkpoint clone has been sanitized, generalized and captured; its digest and local validation evidence are in `oci/inventory/reports/windows-image-validation.json`. The original MPMB disk, firmware and TPM are retained. `import-image.sh` requires explicit image/storage approval and `OCI_APPROVED_IMAGE_SHA256` matching that reviewed final disk; a changed disk is rejected before OCI calls. Keep the requested 100 GB boot allocation and verify imported-image metadata rather than assuming the generic guide's 256 GB value applies.
+Use `ansible-playbook lab.yaml` from `oci/ansible/` after the reviewed host resize and network policy. It installs native KVM/libvirt, OVMF and swtpm without formatting or enlarging the existing data volume. Inspect `systemctl status libvirtd lab-firewall`, `/dev/kvm`, `virsh -c qemu:///system list --all`, `findmnt /srv/pelican` and `/srv/pelican/lab`.
 
-`first-boot.ps1` configures the isolated build clone's Windows 11/TPM/Secure Boot, NLA and router-scoped RDP firewall. Generalization creates the persistent `winlab` administrator through the protected answer file, since Sysprep disables the built-in Administrator. Keep its bootstrap credential in the password manager, rotate it after deployment, and never rely on OCI Windows Server password retrieval for this custom Windows 11 image. Only the prepared private image contains the temporary credential; no password is committed or passed to Terraform. Restrict image/bucket access and remove cached answer files during SetupComplete.
+Follow the [bundle workflow](../README.md#send-and-run-a-windows-guest). A bundle contains matching disks, domain XML, firmware, NVRAM and TPM state; `--save` also captures RAM and leaves the source stopped. Never copy a running disk by bypassing QEMU locks. Do not resume the original and later reuse its checkpoint with modified disks. A plain QCOW2 image cold-boots Windows; it cannot preserve an unsaved desktop by itself.
 
 ```bash
-oci/scripts/status-windows.sh
-OCI_APPROVE_BILLABLE_START=yes oci/scripts/start-windows.sh # only after explicit approval
-oci/scripts/stop-windows.sh # graceful SOFTSTOP, never terminate/reset
+oci/scripts/send-guest.sh oci/windows/work/bundles/mpmb
+oci/scripts/start-windows.sh mpmb-windows11
+oci/scripts/status-windows.sh mpmb-windows11
+oci/scripts/stop-windows.sh mpmb-windows11
 ```
 
-These read the exact identity/profile/region from Terraform outputs, not display-name search. Terraform deliberately omits instance `state` so stops are not undone by a later apply. Use RDP to the **private** Windows IP. Verify interactive login and NLA before accepting deployment, test start/stop/status, then leave STOPPED. The 100 GB boot disk, source upload and custom image keep accruing storage charges while stopped. SOFTSTOP waits for guest shutdown and never falls back to a forced stop. Rebuild/wiping requires explicit approval, a reviewed volume/image plan, and password rotation; “stop” does not wipe data.
+The tools read the exact shared host's private IP/profile from Terraform and use SSH; none issues an OCI host start/stop action. Stopping Windows saves RAM and preserves its disk/TPM/NVRAM while Wings keeps running. A successful restore consumes the cloud working checkpoint; retain exported sending-side bundles as immutable recovery points. A failed restore leaves the checkpoint intact and does not silently cold-boot.
+
+The RDP endpoint is wings-02's private IP, TCP/3389, through Thor. Only the two admin clients receive this grant. The host DNATs to the one active guest at 192.168.124.10 and SNATs to bridge gateway 192.168.124.1. Configure Windows Firewall to allow that gateway, NLA enabled, and confirm `Get-Tpm` and `Confirm-SecureBootUEFI` from an elevated guest console. Use private libvirt/SPICE over SSH for first-boot repair; never expose public RDP, VNC or libvirt TCP. Keep passwords in the password manager and never in a command argument, Terraform state or Git.
+
+CPU/QEMU machine/firmware/TPM compatibility determines whether saved RAM can move between hosts. For repeated transfers use a common CPU profile; changing the source profile requires a guest cold boot, not a Linux host reboot. The import tool validates files and rejects unsupported devices, remote backing files, insufficient space/RAM and another active guest. It does not stop games to make room. Only one nested guest runs at a time behind the stable RDP endpoint.
+
+Disk/state backups contain credentials and keys: use private 0700 directories and encrypted off-node storage. Do not copy an active TPM directory or modify a guest disk while it has a pending RAM checkpoint. A node rebuild must preserve `/srv/pelican/lab`, then reinstall the role and re-register existing domain XML. A checkpoint may need its original QEMU/firmware versions; diagnose restore errors before choosing an explicitly approved cold boot. Never reset TPM or Secure Boot to make a state restore pass.
 
 ## Monitoring and troubleshooting
 
@@ -121,32 +128,9 @@ If Thor fails, use OCI serial console/recovery access (requires an authorized co
 Restore state from the versioned state bucket only with no active writer and after inspecting lineage/serial. Do not force-push state or delete lock objects to bypass another operation. `terraform destroy` is intentionally blocked by retention protections. Safe teardown needs an explicit OCID-level approval: stop games, export consistent data, verify restores, migrate tailnet access first, stop Windows, then review per-resource destruction. Retain Thor, its disk, shared networking and state/backup buckets unless expressly included in the approved plan. Untracked/orphaned volumes and imported-image objects can continue billing; state removal alone does not stop charges.
 
 
-### Windows clone driver preparation
+### Prepared-image recovery
 
-The retained offline checkpoint uses old VirtIO 100.74.104.14100 packages. On the isolated clone, its storage driver failed Windows signature verification (Device Manager Code 52), causing `INACCESSIBLE_BOOT_DEVICE` when selected for boot. Do not disable Secure Boot or signature enforcement.
-
-Download upstream stable [VirtIO-Win 0.1.302-1](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.302-1/virtio-win-gt-x64.msi) locally. Run `windows/extract-virtio.sh downloaded.msi new-driver-directory`; it checks the pinned SHA256 and requires host `7z`. Copy that directory to the isolated clone while it still boots from SATA. Run `windows/install-virtio.ps1 -DriverDirectory C:\path\to\drivers` from an elevated PowerShell session whose execution policy permits your reviewed local script. It validates the three driver catalogs and uses PnP installation, preserving Windows signature checks. Attach a disposable empty VirtIO test disk, confirm storage devices report OK, shut down, then change only the clone's boot disk/NIC to VirtIO. Remove the test disk and confirm an independent boot. The source MPMB VM is never generalized, sanitized or changed by these scripts.
-
-Local validation confirms Windows 11 Pro build 26200, TPM ready/enabled, Secure Boot true and working VirtIO storage/network with SSH over an isolated host port. This does not establish OCI boot/RDP compatibility. The final generalized capture remains private. Local verification does not authorize an OCI upload/import.
-
-
-### Windows clone generalization and capture
-
-These destructive guest steps apply **only to the disposable checkpoint clone**. Keep the source checkpoint, XML, NVRAM and TPM intact. Run `clone-checkpoint.py` first; never point the preparation scripts at the source VM. Install the signed drivers above, configure RDP with `first-boot.ps1`, then disable the copied source account's automatic login and reboot the clone. Log in as its built-in Administrator and verify the copied source profile is unloaded. Keep network isolation while building.
-
-Copy `generalize-clone.ps1` and `unattend.xml.template` together into the clone. In elevated PowerShell, call the script with `-ExpectedCloneUUID`, the distinct `-SourceUUID`, `-SourceAccount` and `-LabPassword (Read-Host -AsSecureString)`. The UUID guard rejects the source. It removes the copied profile/fixtures and SSH keys, clears free clusters, removes installer bypass flags, writes a protected answer file with a `winlab` administrator, and runs Sysprep with shutdown. Check Panther logs for successful generalization. The English locale and explicit OOBE configuration allow unattended first boot without inheriting a source user.
-
-On the host, convert the shut-down generalized clone into a new raw file (`qemu-img convert -O raw`), then use `7z` to extract its Windows NTFS partition to a private regular file. Run `wipe-ntfs-copy.sh` on that **extracted offline copy** to clear unused MFT records, directory/log/pagefile data and file tails; free-cluster clearing alone can retain deleted resident credentials. Run `assemble-sanitized-image.py original.raw sanitized-partition.ntfs new-sanitized.raw` to substitute exactly the matching GPT partition into a new disk, retaining EFI/recovery. It refuses an existing output and leaves inputs unchanged. Finally run `prepare-image.sh new-sanitized.raw new-import.qcow2`; record `qemu-img check`, size and SHA256. Use mode 0700 work directories and 0600 images/credentials; keep all intermediates outside Git. Avoid uploading earlier unsanitized captures.
-
-Test a separate copy of the final capture with fresh Secure Boot NVRAM and TPM 2.0. Verify first boot and NLA authentication as `winlab`, including a wrong-password rejection. This local test uses a private isolated virtual network whose gateway matches router SNAT 10.10.50.10; it does not prove OCI or Tailscale reachability. Leave the upload capture unbooted. The private image retains a temporary bootstrap secret: rotate it at deployment and before reusing the image for another machine.
-
-
-After an explicitly approved image import, `OCI_APPROVE_IMAGE_IMPORT=yes oci/windows/configure-image.sh "$IMAGE_OCID"` applies the [Windows 11-specific OCI image settings](https://docs.oracle.com/en-us/iaas/secure-desktops/windows-image.htm) and E4 compatibility entry. It requires `OCI_APPROVE_IMAGE_IMPORT=yes`, rejects another OS or an image larger than 100 GiB, and preserves other capability overrides. Review its output before setting the Terraform compatibility gate. Live image import and candidate capability API checks now pass; see oci/inventory/reports/windows-oci-import.json. Regular Compute support and actual secure E4 boot remain unverified. Keep the compatibility gate false until the documented support constraint in validation.md is resolved. Secure Boot, measured boot and TPM stay enabled in Terraform. Do not replace these checks with registry bypasses.
-
-
-Validate the complete tailnet policy against the API before applying it, including all 13 embedded cases and the denied administration paths. Keep native Tailscale SSH disabled when using these OpenSSH grants. For optiplex recovery over the tailnet, retain its configured identity with `ssh -o HostName=100.77.7.115 optiplex`.
-
-The homelab inventory retains the existing `pos`/`optiplex` SSH aliases so their configured keys are used. Optiplex has a tailnet HostName override because its recorded LAN SSH address was unreachable during discovery. This Ansible project disables SSH multiplexing: the pos check failed with a reused connection and succeeded with ordinary SSH. Both homelab `hostname` checks passed without guest changes. Reconcile an existing private inventory with these connection settings before provisioning.
+Retain the existing private sanitized source/image artifacts until replacement guest access and backups are verified. If rebuilding a source clone, use the pinned signed VirtIO driver tooling under `oci/windows/`; preserve Secure Boot and TPM and leave the original MPMB VM unchanged. The native OCI image-import scripts are retained artifact/recovery tools, not prerequisites for nested guests. Rotate any temporary bootstrap credential from a prepared image after first boot.
 
 ## Dedicated callback listener
 

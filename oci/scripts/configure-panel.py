@@ -97,8 +97,8 @@ for name, instance in sorted(nodes.items()):
     retained = name == 'wings-04'
     desired = {'name': name, 'fqdn': name + '.oci.home.internal', 'scheme': 'https',
                'public': True, 'behind_proxy': False, 'maintenance_mode': False,
-               'memory': 20480 if retained else (capacity[name]['memory_gb'] - 2) * 1024, 'memory_overallocate': 0,
-               'disk': 81920 if retained else int(capacity[name]['data_gb'] * 0.9) * 1024, 'disk_overallocate': 0,
+               'memory': 20480 if retained else (capacity[name]['memory_gb'] - capacity[name].get('host_reserve_gb', 2) - capacity[name].get('guest_memory_gb', 0)) * 1024, 'memory_overallocate': 0,
+               'disk': 81920 if retained else (int(capacity[name]['data_gb'] * 0.9) - capacity[name].get('guest_disk_gb', 0)) * 1024, 'disk_overallocate': 0,
                'cpu': 400 if retained else capacity[name]['ocpus'] * 200, 'cpu_overallocate': 0, 'upload_size': 256,
                'daemon_base': '/var/lib/pelican/volumes' if retained else '/srv/pelican/volumes',
                'daemon_listen': 8080, 'daemon_connect': 8080, 'daemon_sftp': 2022}

@@ -1,0 +1,123 @@
+- name: Require the reviewed Ubuntu host and private interface
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version is version('26.04', '>=')
+      - ansible_facts.architecture == 'x86_64'
+      - ansible_facts.default_ipv4.address == lab_private_ip
+- name: Install native KVM, libvirt, firmware and TPM tooling
+  ansible.builtin.apt:
+    name: [qemu-kvm, qemu-system-gui, qemu-utils, libvirt-daemon-system, libvirt-clients, ovmf, swtpm, swtpm-tools, dnsmasq-base, iptables, python3, python3-lxml]
+    state: present
+    update_cache: true
+- name: Verify hardware-accelerated KVM without rebooting or loading replacement modules
+  ansible.builtin.command:
+    argv: [python3, -c, "import os,fcntl; k=os.open('/dev/kvm',os.O_RDWR); assert fcntl.ioctl(k,0xAE00,0)==12; v=fcntl.ioctl(k,0xAE01,0); c=fcntl.ioctl(v,0xAE41,0); os.close(c); os.close(v); os.close(k)"]
+  changed_when: false
+- name: Verify the existing Wings data filesystem without formatting or resizing it
+  ansible.builtin.command: findmnt -n -o FSTYPE --mountpoint /srv/pelican
+  register: lab_existing_mount
+  changed_when: false
+- name: Require the existing ext4 data mount
+  ansible.builtin.assert:
+    that: lab_existing_mount.stdout == 'ext4'
+- name: Create persistent guest storage without replacing existing data
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: directory
+    owner: '{{ item.owner }}'
+    group: '{{ item.owner }}'
+    mode: '{{ item.mode }}'
+  loop:
+    - {path: /srv/pelican/lab, owner: root, mode: '0755'}
+    - {path: /srv/pelican/lab/guests, owner: root, mode: '0755'}
+    - {path: /srv/pelican/lab/incoming, owner: ubuntu, mode: '0700'}
+    - {path: /etc/systemd/system/docker.service.d, owner: root, mode: '0755'}
+- name: Enable routing for the private nested network
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    reload: true
+    sysctl_file: /etc/sysctl.d/70-nested-lab.conf
+- name: Install the isolated lab firewall
+  ansible.builtin.template:
+    src: firewall.sh.j2
+    dest: /usr/local/sbin/lab-firewall
+    owner: root
+    group: root
+    mode: '0750'
+    validate: bash -n %s
+  notify: Reload lab firewall
+- name: Install the dedicated persistent firewall unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/lab-firewall.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Private nested-lab firewall
+      Wants=network-online.target
+      After=network-online.target docker.service libvirtd.service
+      PartOf=docker.service
+      RequiresMountsFor=/srv/pelican
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/lab-firewall
+      ExecReload=/usr/local/sbin/lab-firewall
+      [Install]
+      WantedBy=multi-user.target
+- name: Reapply only lab rules after a future Docker restart
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/70-lab-firewall.conf
+    mode: '0644'
+    content: |
+      [Unit]
+      Wants=lab-firewall.service
+- name: Enable libvirt for local UNIX-socket and SSH administration
+  ansible.builtin.systemd_service:
+    name: libvirtd
+    enabled: true
+    state: started
+- name: Enable the dedicated firewall without flushing game-server rules
+  ansible.builtin.systemd_service:
+    name: lab-firewall
+    daemon_reload: true
+    enabled: true
+    state: started
+- name: Allow the existing SSH operator to manage local guests
+  ansible.builtin.user:
+    name: ubuntu
+    groups: [libvirt, kvm]
+    append: true
+- name: Store the private guest-network definition
+  ansible.builtin.template:
+    src: network.xml.j2
+    dest: /etc/libvirt/lab-network.xml
+    mode: '0644'
+  register: lab_network_definition
+- name: Inspect the network without modifying it
+  ansible.builtin.command: virsh -c qemu:///system net-info lab
+  environment: {LC_ALL: C}
+  register: lab_network
+  failed_when: lab_network.rc not in [0, 1]
+  changed_when: false
+- name: Define the persistent network without interrupting a running guest
+  ansible.builtin.command: virsh -c qemu:///system net-define /etc/libvirt/lab-network.xml
+  when: lab_network.rc != 0 or lab_network_definition.changed
+  changed_when: true
+- name: Start the network if inactive
+  ansible.builtin.command: virsh -c qemu:///system net-start lab
+  when: lab_network.rc != 0 or not (lab_network.stdout is search('Active:\s+yes'))
+  changed_when: true
+- name: Persist the network across host starts
+  ansible.builtin.command: virsh -c qemu:///system net-autostart lab
+  when: lab_network.rc != 0 or not (lab_network.stdout is search('Autostart:\s+yes'))
+  changed_when: true
+- name: Install the reviewed guest bundle and lifecycle tool
+  ansible.builtin.copy:
+    src: '{{ playbook_dir }}/../windows/guest-bundle.py'
+    dest: /usr/local/sbin/lab-guest
+    owner: root
+    group: root
+    mode: '0755'

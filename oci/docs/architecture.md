@@ -6,7 +6,7 @@ flowchart LR
   K3S[Existing pos + optiplex\naccept routes + scoped pod SNAT] -->|Tailnet then OCI subnet routing| Router
   K3S --> Panel[Traefik + homelab CA TLS\nPelican Panel + SQLite PVC]
   Router -->|SNAT source 10.10.50.10| Wings[10.10.50.0/24\nwings-01..02 E6 + wings-04 A1]
-  Router -->|SNAT, private RDP| Win[10.10.10.0/24\nwin11-lab E4 / normally stopped]
+  Router -->|SNAT, private RDP :3389| Lab[wings-02 private IP\nKVM + private NAT Windows guest]
   Players[Internet game clients] -->|IGW / public IPv4 / TCP+UDP 25565–25765| Wings
   Wings -->|TLS callback proxy on router private :443| Router
   Router -->|Verified TLS / isolated callback listener :8443| Panel
@@ -16,11 +16,11 @@ flowchart LR
 | Node | Shape | CPU / RAM | Boot / data | Architecture |
 |---|---|---|---|---|
 | wings-01 | VM.Standard.E6.Flex | 4 / 32 GB | 50 / 400 GB | x86-64 Ubuntu 26.04 |
-| wings-02 | VM.Standard.E6.Flex | 2 / 16 GB | 50 / 200 GB | x86-64 Ubuntu 26.04 |
+| wings-02 | VM.Standard.E6.Flex | 2 / 34 GB | 50 / 200 GB | x86-64 Ubuntu 26.04 |
 | wings-04 (existing Thor) | VM.Standard.A1.Flex | existing 4 / 24 GB | existing 100 / none separate | ARM64 Ubuntu 26.04 Minimal |
-| win11-lab | VM.Standard.E4.Flex | 2 / 16 GB | 100 / none | Windows 11 x86-64; blocked pending supported image+TPM path |
+| Windows guest | Nested KVM on wings-02 | up to 4 vCPUs / 16 GiB | QCOW2 and RAM within reserved data space | x86-64; UEFI Secure Boot + TPM 2.0 |
 
-Paid storage is 800 GB including Windows (700 GB Linux); Thor's 100 GB is separate. All disks stay at the selected 10 VPU balanced tier. Prevent-destroy protects retained Always Free resources and shared network; ignored imported launch fields preserve actual settings. This preservation phase intentionally avoids changing Thor's OCI/guest hostname; use `wings-04` in Panel and inventory.
+Paid OCI storage remains 700 GB; nested Windows shares wings-02 storage; Thor's 100 GB is separate. All disks stay at the selected 10 VPU balanced tier. Prevent-destroy protects retained Always Free resources and shared network; ignored imported launch fields preserve actual settings. This preservation phase intentionally avoids changing Thor's OCI/guest hostname; use `wings-04` in Panel and inventory.
 
 ## Routing and sources
 
@@ -47,3 +47,13 @@ Local-path is not high-availability replicated storage: it pins storage to a hom
 Thor uses the ARM64 Wings binary with a release checksum; paid nodes use amd64. Select a game image whose manifest includes linux/arm64 and verify the egg/binary supports it. x86-64 images and native game binaries do **not** run natively on Thor. Do not use emulation as acceptance evidence. The declarative Mindustry v160.7 acceptance egg pins its server JAR checksum, multiarch Java runtime and installer digests. Use native amd64 on paid nodes and native arm64 on Thor. Run public protocol checks and an interactive client session when accepting a new game or runtime; repeat persistence checks after an approved reboot.
 
 Sources: [Pelican Wings](https://pelican.dev/docs/wings/install/), [official Docker deployment](https://pelican.dev/docs/panel/advanced/docker/), [tagged container supervisor](https://github.com/pelican-dev/panel/blob/v1.0.0-rc.2/docker/supervisord.conf), [Docker Ubuntu support/firewall constraints](https://docs.docker.com/engine/install/ubuntu/), [Tailscale subnet routing](https://tailscale.com/docs/features/subnet-routers).
+
+## Shared nested lab
+
+Wings-02 is a shared host, not an on-demand OCI Windows instance. KVM, libvirt, OVMF and swtpm use Ubuntu packages. One active guest uses a private `virbr-lab` network, 192.168.124.0/24. The Linux host forwards only approved private RDP from the subnet router to guest 192.168.124.10; it SNATs that connection to gateway 192.168.124.1. The guest firewall permits that gateway with NLA enabled. No Tailscale client is installed inside Windows.
+
+Dedicated `LAB-*` chains match only the nested bridge and private RDP mapping. Existing Wings/Docker rules remain intact. Guests can reach the public Internet but cannot initiate access to the homelab, tailnet, OCI private networks or metadata endpoint. DNS/DHCP to the private bridge gateway are the only new guest-to-host services. Libvirt has local UNIX-socket/SSH management, not a public TCP management port; SPICE listens on no public socket.
+
+The shared allocation reserves 4 GiB host overhead, 16 GiB guest RAM and 14 GiB Wings RAM. Its 200 GB data volume has a 120 GiB guest storage budget and 60 GiB Wings budget, with remaining filesystem headroom. These are monitored allocation budgets rather than hard disk partitions. CPU is shared; there is no new per-guest OCI compute charge. Saving Windows does not stop Wings or its host.
+
+Moving RAM requires matching virtual hardware/firmware/TPM and compatible CPU/QEMU, not just a QCOW2 file. A disk-only import cold-boots Windows. A failed state restore preserves the checkpoint and never silently falls back to a reboot. Use a common CPU profile for repeated transfers; keep source and destination saved states paired with their exact disk contents.

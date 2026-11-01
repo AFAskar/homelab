@@ -18,7 +18,8 @@
     "other-member-desktop": "100.92.186.41",
     "other-member-laptop": "100.90.203.86",
     "owner-phone": "100.88.31.107",
-    "old-home-router": "100.116.46.69"
+    "old-home-router": "100.116.46.69",
+    "lab-host": "10.10.50.146"
   },
   "acls": [],
   "grants": [
@@ -128,18 +129,6 @@
         "admin-freyr"
       ],
       "dst": [
-        "oci-windows-subnet"
-      ],
-      "ip": [
-        "tcp:3389"
-      ]
-    },
-    {
-      "src": [
-        "admin-laptop",
-        "admin-freyr"
-      ],
-      "dst": [
         "thor",
         "tag:oci-router"
       ],
@@ -187,6 +176,18 @@
         "tcp:53",
         "udp:53"
       ]
+    },
+    {
+      "src": [
+        "admin-laptop",
+        "admin-freyr"
+      ],
+      "dst": [
+        "lab-host"
+      ],
+      "ip": [
+        "tcp:3389"
+      ]
     }
   ],
   "ssh": [],
@@ -205,12 +206,13 @@
         "wings-04-private:22",
         "wings-04-private:8080",
         "wings-04-private:2022",
-        "10.10.10.20:3389"
+        "lab-host:3389"
       ],
       "deny": [
         "pos:2375",
         "10.10.10.20:22",
-        "wings-04-private:2375"
+        "wings-04-private:2375",
+        "10.10.10.20:3389"
       ]
     },
     {
@@ -221,11 +223,12 @@
         "wings-04-private:22",
         "wings-04-private:8080",
         "pos:443",
-        "10.10.10.20:3389"
+        "lab-host:3389"
       ],
       "deny": [
         "admin-laptop:22",
-        "pos:2375"
+        "pos:2375",
+        "10.10.10.20:3389"
       ]
     },
     {
@@ -240,7 +243,8 @@
         "wings-04-private:22",
         "wings-04-private:2022",
         "10.10.10.20:3389",
-        "admin-laptop:22"
+        "admin-laptop:22",
+        "lab-host:3389"
       ]
     },
     {
@@ -253,7 +257,8 @@
       "deny": [
         "wings-04-private:22",
         "pos:6443",
-        "10.10.10.20:3389"
+        "10.10.10.20:3389",
+        "lab-host:3389"
       ]
     },
     {
@@ -271,7 +276,8 @@
         "pos:443",
         "pos:80",
         "optiplex:8443",
-        "pos:32443"
+        "pos:32443",
+        "lab-host:3389"
       ]
     },
     {
@@ -288,7 +294,8 @@
         "pos:443",
         "pos:80",
         "optiplex:8443",
-        "pos:32443"
+        "pos:32443",
+        "lab-host:3389"
       ]
     },
     {
@@ -301,7 +308,8 @@
         "wings-04-private:22",
         "wings-04-private:8080",
         "10.10.10.20:3389",
-        "admin-laptop:22"
+        "admin-laptop:22",
+        "lab-host:3389"
       ]
     },
     {
@@ -313,7 +321,8 @@
         "thor:22",
         "wings-04-private:22",
         "wings-04-private:8080",
-        "10.10.10.20:3389"
+        "10.10.10.20:3389",
+        "lab-host:3389"
       ]
     },
     {
@@ -330,7 +339,8 @@
         "wings-04-private:2022",
         "wings-04-private:9100",
         "10.10.10.20:3389",
-        "admin-freyr:3389"
+        "admin-freyr:3389",
+        "lab-host:3389"
       ],
       "accept": [
         "pos:80",
@@ -346,7 +356,8 @@
       "deny": [
         "pos:22",
         "wings-04-private:22",
-        "10.10.10.20:3389"
+        "10.10.10.20:3389",
+        "lab-host:3389"
       ]
     },
     {
@@ -375,7 +386,8 @@
         "pos:53"
       ],
       "deny": [
-        "pos:22"
+        "pos:22",
+        "lab-host:3389"
       ]
     },
     {

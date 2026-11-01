@@ -35,6 +35,8 @@ if path.exists():
             del hosts[name]
     for name, node in capacity.items():
         hosts.setdefault(name, children['wings']['hosts'][name])['wings_data_size_gb'] = node['data_gb']
+    if 'lab_host' in d:
+        current.setdefault('lab', {}).setdefault('hosts', {}).setdefault('wings-02', {})
     for group in ['subnet_routers', 'thor_bootstrap']:
         for host in current.get(group, {}).get('hosts', {}).values():
             host['tailscale_routes'] = routes

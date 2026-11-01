@@ -36,6 +36,9 @@ all:
           ansible_ssh_common_args: >-
             -o IdentityAgent=/home/azoz-laptop/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock
             -o IdentitiesOnly=yes
+    lab:
+      hosts:
+        wings-02: {} # Same machine, credentials and data volume as the Wings group.
     subnet_routers:
       hosts:
         wings-04:

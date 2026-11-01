@@ -14,10 +14,6 @@ variable "ubuntu_image_ocid" {
   description = "Region-specific Canonical Ubuntu 26.04 x86_64 image verified against E6.Flex. No automatic latest/fallback."
   type        = string
 }
-variable "windows_image_ocid" {
-  description = "Imported Windows 11 image OCID; review accepted firmware, TPM and E4 capabilities before the approved first launch."
-  type        = string
-}
 variable "ssh_public_key" {
   type = string
   validation {
@@ -80,11 +76,6 @@ variable "billing_units_per_eur" {
 }
 variable "discovery_reviewed" {
   description = "Set only after inventory, quota, free eligibility, ingress and non-overlap reviews."
-  type        = bool
-  default     = false
-}
-variable "windows_compatibility_verified" {
-  description = "Keep false until a documented service-supported Windows 11 custom-image/E4 Secure Boot/TPM2/UEFI path and the 100GB boot minimum are established. Metadata acceptance alone is insufficient; live boot/RDP follows a separate approved launch."
   type        = bool
   default     = false
 }

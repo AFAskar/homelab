@@ -12,7 +12,7 @@ resource "oci_core_instance" "wings" {
     subnet_id        = var.wings_subnet_ocid
     assign_public_ip = true
     hostname_label   = each.key
-    nsg_ids          = [oci_core_network_security_group.wings.id]
+    nsg_ids          = concat([oci_core_network_security_group.wings.id], each.key == "wings-02" ? [oci_core_network_security_group.windows.id] : [])
   }
   source_details {
     source_type             = "image"
@@ -44,49 +44,5 @@ resource "oci_core_instance" "wings_04" {
   lifecycle {
     prevent_destroy = true
     ignore_changes  = all
-  }
-}
-resource "oci_core_instance" "windows" {
-  compartment_id      = var.compartment_ocid
-  availability_domain = var.availability_domain
-  display_name        = "win11-lab"
-  shape               = "VM.Standard.E4.Flex"
-  shape_config {
-    ocpus         = 2
-    memory_in_gbs = 16
-  }
-  create_vnic_details {
-    subnet_id        = var.windows_subnet_ocid
-    assign_public_ip = false
-    hostname_label   = "win11-lab"
-    nsg_ids          = [oci_core_network_security_group.windows.id]
-  }
-  source_details {
-    source_type             = "image"
-    source_id               = var.windows_image_ocid
-    boot_volume_size_in_gbs = 100
-    boot_volume_vpus_per_gb = 10
-  }
-  launch_options {
-    firmware         = "UEFI_64"
-    boot_volume_type = "PARAVIRTUALIZED"
-    network_type     = "PARAVIRTUALIZED"
-  }
-  platform_config {
-    type                               = "AMD_VM"
-    is_secure_boot_enabled             = true
-    is_measured_boot_enabled           = true
-    is_trusted_platform_module_enabled = true
-  }
-  preserve_boot_volume = true
-  freeform_tags        = local.tags
-  depends_on           = [terraform_data.review_gate, terraform_data.network_gate]
-  lifecycle {
-    prevent_destroy = true
-    precondition {
-      condition     = var.windows_compatibility_verified
-      error_message = "Windows 11 blocked: verify custom-image TPM2/UEFI support and the imported image boot-volume requirements before proceeding. The requested allocation remains 100GB."
-    }
-    # Do not manage state=RUNNING: CLI start/stop must not be undone by Terraform.
   }
 }

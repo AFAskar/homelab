@@ -31,3 +31,10 @@ oci/docs/*.json
 docker/adguardhome/AdGuardHome.yaml
 docker/adguardhome/work/
 docker/adguardhome/*.plain*.yaml
+
+# Private nested-VM checkpoints, firmware/NVRAM and TPM material
+oci/**/*.save
+oci/**/*.fd
+oci/**/nvram.bin
+oci/**/firmware.bin
+oci/**/tpm/

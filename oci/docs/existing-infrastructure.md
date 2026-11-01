@@ -70,7 +70,7 @@ shared gateways, routes, DHCP defaults and Thor VNIC/storage dependencies.
 | Resource | Allocation / data | Recovery source |
 |---|---|---|
 | wings-01 | E6 4 OCPUs/32 GB, Ubuntu 26.04 amd64, 50 GB boot + 400 GB balanced data | Terraform + Wings role; retain data disk |
-| wings-02 | E6 2 OCPUs/16 GB, Ubuntu 26.04 amd64, 50 GB boot + 200 GB balanced data | Terraform + Wings role; retain data disk |
+| wings-02 | E6 2 OCPUs/34 GB, Ubuntu 26.04 amd64, 50 GB boot + 200 GB balanced data | Terraform + Wings role; retain data disk |
 | Paid Wings data | ext4 UUID mounts at `/srv/pelican`; games under `volumes/` | Selected encrypted backups |
 | State bucket | Private Standard `homelab-tfstate`, versioned | Bootstrap prerequisite outside this root |
 | Image-source bucket | Private `homelab-win11-images` | Terraform bucket; import tooling owns source objects/images |
@@ -78,7 +78,7 @@ shared gateways, routes, DHCP defaults and Thor VNIC/storage dependencies.
 | Wings/router/Windows NSGs | Public game pool; private administration/callbacks | Terraform |
 | Budget | Native EUR monthly actual-spend alerts | Terraform; alerts do not cap spending |
 | Windows image | Windows/Windows11, 81,920 MB, prepared from a sanitized 80 GiB clone | Import/configuration scripts |
-| Windows VM | Required E4 2 OCPUs/16 GB/100 GB | Launch only after technical verification and approval |
+| Nested Windows lab | Shared wings-02 KVM; private files under `/srv/pelican/lab` | libvirt bundle/checkpoint and guest backups |
 
 Windows source/custom-image artifacts remain billable independently of an
 instance. Preserve the MPMB reference VM; prepare/generalize only a separate
