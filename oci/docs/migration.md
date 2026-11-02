@@ -11,7 +11,7 @@ before billable, destructive or irreversible operations.
 
 Create the dedicated private versioned `homelab-tfstate` bucket only after bootstrap approval. Use the existing tenancy namespace and Ymir compartment. Grant state operators only the required bucket-read, object read/write and lock-object operations, scoped to this state bucket; keep bucket creation and legacy image-artifact permissions separate. Do not create public access or a PAR for state.
 
-Copy `terraform/backend.hcl.example` to ignored `terraform/backend.hcl` only if absent, reconcile bucket/namespace/home-region/profile and initialize the real root. Credentials stay in the OCI profile or environment. The backend's native lock must be respected; never delete another operation's lock or force-push state to bypass concurrency.
+Copy `oci/terraform/backend.hcl.example` to ignored `oci/terraform/backend.hcl` only if absent, reconcile bucket/namespace/home-region/profile and initialize the real root. Credentials stay in the OCI profile or environment. The backend's native lock must be respected; never delete another operation's lock or force-push state to bypass concurrency.
 
 The private Windows image/source bucket is retained recovery storage. Nested KVM does not require a new OCI image import for each guest. Existing OCI image metadata is not proof of native Windows Compute support and is not used by the shared-host design.
 

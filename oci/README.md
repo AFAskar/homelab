@@ -15,7 +15,7 @@ The native OCI Windows-image workflow is not needed for nested guests. Existing 
 ## Terraform and preservation
 
 1. Configure an OCI CLI/API-key profile and install the pinned Terraform/provider versions from `terraform/versions.tf`. Inspect the tenancy with `scripts/inventory.sh` before changing retained resources.
-2. Copy `terraform/terraform.tfvars.example` only when a private variable file does not already exist. Reconcile discovered OCIDs, SSH public key, recipients and EUR billing currency. Never put private keys, OAuth secrets or Windows passwords in Terraform variables/user-data.
+2. Copy `oci/terraform/terraform.tfvars.example` only when a private variable file does not already exist. Reconcile discovered OCIDs, SSH public key, recipients and EUR billing currency. Never put private keys, OAuth secrets or Windows passwords in Terraform variables/user-data.
 3. Follow [migration](docs/migration.md) for the existing private versioned backend, imports, state access and the Always Free preservation checks. Import shared resources before updating them; reject unintended replacement. Keep backend configuration, state, plans and raw inventory private.
 4. Load the existing Tailscale OAuth credential by file reference and validate the complete root:
 
