@@ -7,7 +7,7 @@
       - ansible_facts.default_ipv4.address == lab_private_ip
 - name: Install native KVM, libvirt, firmware and TPM tooling
   ansible.builtin.apt:
-    name: [qemu-system-x86, qemu-system-gui, qemu-utils, libvirt-daemon-system, libvirt-clients, ovmf, swtpm, swtpm-tools, dnsmasq-base, iptables, python3, python3-lxml]
+    name: [qemu-system-x86, qemu-system-gui, qemu-utils, libvirt-daemon-system, libvirt-clients, ovmf, swtpm, swtpm-tools, dnsmasq-base, iptables, python3, python3-lxml, python3-libvirt]
     state: present
     update_cache: true
 - name: Permit TPM state only in the private lab store
