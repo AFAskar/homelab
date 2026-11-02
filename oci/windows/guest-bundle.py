@@ -8,6 +8,7 @@ the sending machine. No cold-boot fallback is performed for a failed restore.
 """
 import argparse
 import copy
+from contextlib import contextmanager, nullcontext
 import fcntl
 import hashlib
 import json
@@ -23,6 +24,20 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path('/srv/pelican/lab/guests')
 URI = 'qemu:///system'
+LOCKFILE = Path('/run/libvirt/homelab-lab.lock')
+
+
+@contextmanager
+def exclusive_host_operation():
+    if os.geteuid() != 0:
+        raise ValueError('Run host operations through sudo')
+    with LOCKFILE.open('a') as lock:
+        os.chmod(LOCKFILE, 0o600)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError('Another guest import/start/save is active; inspect it before retrying') from None
+        yield
 
 
 def run(*args, uri=None, capture=True):
@@ -436,11 +451,12 @@ def main():
         s = sub.add_parser(command); s.add_argument('name')
     args = p.parse_args()
     try:
-        if args.command == 'export': export(args)
-        elif args.command == 'image': image(args)
-        elif args.command == 'check': verify(args.directory); print('Bundle checksums and guest security configuration passed')
-        elif args.command == 'import': import_guest(args)
-        else: lifecycle(args)
+        with exclusive_host_operation() if args.command in {'import', 'start', 'save'} else nullcontext():
+            if args.command == 'export': export(args)
+            elif args.command == 'image': image(args)
+            elif args.command == 'check': verify(args.directory); print('Bundle checksums and guest security configuration passed')
+            elif args.command == 'import': import_guest(args)
+            else: lifecycle(args)
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -41,5 +41,17 @@ class FailedSave(unittest.TestCase):
         self.assertEqual(self.exercise(b'possible RAM recovery'), (True, b'possible RAM recovery'))
 
 
+class HostSerialization(unittest.TestCase):
+    def test_overlapping_guest_mutations_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(guest, 'LOCKFILE', Path(temporary) / 'guest.lock'), patch.object(guest.os, 'geteuid', return_value=0):
+                with guest.exclusive_host_operation():
+                    with self.assertRaisesRegex(ValueError, 'Another guest'):
+                        with guest.exclusive_host_operation():
+                            self.fail('Concurrent guest mutation was admitted')
+                with guest.exclusive_host_operation():
+                    pass
+
+
 if __name__ == '__main__':
     unittest.main()
