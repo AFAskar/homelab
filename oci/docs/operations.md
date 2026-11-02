@@ -105,6 +105,8 @@ oci/scripts/stop-windows.sh mpmb-windows11
 
 The tools read the exact shared host's private IP/profile from Terraform and use SSH; none issues an OCI host start/stop action. Stopping Windows saves RAM and preserves its disk/TPM/NVRAM while Wings keeps running. A successful restore consumes the cloud working checkpoint; retain exported sending-side bundles as immutable recovery points. A failed restore leaves the checkpoint intact and does not silently cold-boot.
 
+For the prepared `win11-lab` guest, retrieve the login from ignored `oci/ansible/secrets/windows-lab.json` (mode 0600) and store it in your password manager. Do not paste its contents into chat, command arguments or Git. Imported personal guests retain their own accounts.
+
 The RDP endpoint is wings-02's private IP, TCP/3389, through Thor. Only the two admin clients receive this grant. The host DNATs to the one active guest at 192.168.124.10 and SNATs to bridge gateway 192.168.124.1. Configure Windows Firewall to allow that gateway, NLA enabled, and confirm `Get-Tpm` and `Confirm-SecureBootUEFI` from an elevated guest console. Use private libvirt/SPICE over SSH for first-boot repair; never expose public RDP, VNC or libvirt TCP. Keep passwords in the password manager and never in a command argument, Terraform state or Git.
 
 CPU/QEMU machine/firmware/TPM compatibility determines whether saved RAM can move between hosts. For repeated transfers use a common CPU profile; changing the source profile requires a guest cold boot, not a Linux host reboot. The import tool validates files and rejects unsupported devices, remote backing files, insufficient space/RAM and another active guest. It does not stop games to make room. Only one nested guest runs at a time behind the stable RDP endpoint.
