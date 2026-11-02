@@ -106,6 +106,9 @@ for name, instance in sorted(nodes.items()):
         '$n=App\\Models\\Node::firstOrCreate(["name"=>$data["node"]["name"]],$data["node"]); '
         'foreach(["fqdn","scheme","daemon_base"] as $k){ '
         'if($n->$k!==$data["node"][$k]) throw new RuntimeException("Existing node differs: ".$k); } '
+        'foreach(["memory","disk"] as $limit){ '
+        'if($n->servers()->where($limit,0)->exists() || $n->servers()->sum($limit)>$data["node"][$limit]) '
+        'throw new RuntimeException("Existing server allocations exceed node budget: ".$limit); } '
         '$n->update(collect($data["node"])->only(["memory","disk","cpu"])->all()); '
         # Approved inclusive pool: 201 allocations per node, including existing 25565.
         'foreach(range(25565,25765) as $port){ '
