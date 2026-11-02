@@ -21,11 +21,10 @@ python3 oci/scripts/test-lifecycle.py
 
 Review every replacement, deletion, shape/storage change and public ingress
 change before applying. Retained imports must propose no unintended resource
-changes. If the Windows compatibility prerequisite is unresolved, a full-root
-plan must fail its Windows precondition. Use only an explicitly reviewed,
-approved staged plan for independent non-Windows work; a targeted check is
-not a clean full-environment plan. After applying, generate a fresh plan and
-explain any difference before making another change.
+changes. Nested Windows shares wings-02 and is managed through libvirt; the
+Terraform root contains no separate native Windows instance. A targeted check
+is not a clean full-environment plan. After applying, generate a fresh full-root
+plan and explain any difference before making another change.
 
 Build the Panel, Traefik and Argo roots with the authorized KSOPS environment:
 
