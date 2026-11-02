@@ -194,7 +194,7 @@ def image(args):
         <feature enabled='yes' name='secure-boot'/><feature enabled='yes' name='enrolled-keys'/>
       </firmware><boot dev='hd'/></os>
       <features><acpi/><apic/><smm state='on'/></features>
-      <cpu mode='custom' match='exact' check='full'><model fallback='forbid'>EPYC-Rome-v5</model><topology sockets='1' cores='4' threads='1'/></cpu>
+      <cpu mode='custom' match='exact' check='full'><model fallback='forbid'>EPYC-Rome-v5</model><feature policy='disable' name='lbrv'/><feature policy='disable' name='tsc-scale'/><feature policy='disable' name='pause-filter'/><feature policy='disable' name='pfthreshold'/><feature policy='disable' name='v-vmsave-vmload'/><topology sockets='1' cores='4' threads='1'/></cpu>
       <clock offset='localtime'/><on_poweroff>destroy</on_poweroff><on_reboot>restart</on_reboot>
       <devices><emulator>/usr/bin/qemu-system-x86_64</emulator>
       <disk type='file' device='disk'><driver name='qemu' type='qcow2'/><source file='disk-0.qcow2'/><target dev='vda' bus='virtio'/></disk>
@@ -333,7 +333,7 @@ def import_guest(args):
             if path == destination:
                 shutil.chown(path, user='root', group='root'); path.chmod(0o711)
             elif path.is_relative_to(destination / 'tpm'):
-                shutil.chown(path, user='tss', group='tss'); path.chmod(0o700 if path.is_dir() else 0o600)
+                shutil.chown(path, user='swtpm', group='swtpm'); path.chmod(0o700 if path.is_dir() else 0o600)
             elif path in writable:
                 shutil.chown(path, user='libvirt-qemu', group='libvirt-qemu'); path.chmod(0o600)
             else:
@@ -405,6 +405,11 @@ def lifecycle(args):
         required = sum(max(0, i['virtual-size'] - i.get('actual-size', 0)) for i in infos) + (0 if checkpoint.exists() else ram) + 1073741824
         if free < required:
             raise ValueError('Insufficient space for disk growth and RAM save; archive inactive guests or review a larger data volume')
+        tpm = directory / 'tpm'
+        if not tpm.exists():
+            # libvirt removes an empty TPM directory after failed manufacturing.
+            tpm.mkdir(mode=0o700)
+            shutil.chown(tpm, user='swtpm', group='swtpm')
         activate_network(xml, directory)
         if checkpoint.exists():
             # libvirt enforces the saved ABI; failures retain the checkpoint.
