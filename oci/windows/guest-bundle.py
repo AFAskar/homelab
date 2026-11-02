@@ -288,57 +288,68 @@ def import_guest(args):
     # The incoming folder is on the same data volume; do not double-copy disks.
     if args.directory.resolve().parent != Path('/srv/pelican/lab/incoming'):
         raise ValueError('Import only a fresh /srv/pelican/lab/incoming/<transfer-id> directory')
+    original_xml = (args.directory / 'domain.xml').read_bytes()
     args.directory.rename(destination)
-    for disk in xml.findall('./devices/disk'):
-        source = disk.find('source')
-        if source is not None:
-            source.set('file', str(destination / source.get('file')))
-    for tag in ['loader', 'nvram']:
-        element = xml.find('./os/' + tag)
-        if element is not None and element.text:
-            if element.text not in m['sha256']:
-                raise ValueError('Firmware/NVRAM is outside the verified bundle')
-            element.text = str(destination / element.text)
-    if xml.find('./os/nvram') is None:
-        ET.SubElement(xml.find('os'), 'nvram').text = str(destination / 'nvram.fd')
-    for label in list(xml.findall('seclabel')) + list(xml.findall('resource')):
-        xml.remove(label)
-    for audio in xml.findall('./devices/audio'):
-        audio.set('type', 'spice')
-    xml.find('./devices/emulator').text = '/usr/bin/qemu-system-x86_64'
-    nic = xml.find('./devices/interface'); nic.set('type', 'network')
-    for child in list(nic):
-        if child.tag in ['source', 'backend', 'target', 'script', 'filterref', 'portForward', 'virtualport']:
-            nic.remove(child)
-    ET.SubElement(nic, 'source', {'network': 'lab'})
-    for graphics in xml.findall('./devices/graphics'):
-        graphics.attrib = {'type': 'spice'}
-        for child in list(graphics):
-            graphics.remove(child)
-        ET.SubElement(graphics, 'listen', {'type': 'none'})
-    for element in xml.findall('./devices/channel/source') + xml.findall('./devices/serial/source') + xml.findall('./devices/console/source'):
-        element.attrib.pop('path', None)
-    for rng in xml.findall('./devices/rng/backend'):
-        rng.text = '/dev/urandom'
-    backend = xml.find('./devices/tpm/backend')
-    backend.find('source').set('path', str(destination / 'tpm'))
-    backend.set('persistent_state', 'yes')
-    # QEMU may write its disks, not the root-owned control XML or directory.
-    writable = {Path(e.get('file')) for e in xml.findall('./devices/disk/source')}
-    writable |= {Path(e.text) for e in [xml.find('./os/loader'), xml.find('./os/nvram')] if e is not None and e.text}
-    writable.add(destination / 'state.save')
-    for path in [destination, *destination.rglob('*')]:
-        if path == destination:
-            shutil.chown(path, user='root', group='root'); path.chmod(0o711)
-        elif path.is_relative_to(destination / 'tpm'):
-            shutil.chown(path, user='tss', group='tss'); path.chmod(0o700 if path.is_dir() else 0o600)
-        elif path in writable:
-            shutil.chown(path, user='libvirt-qemu', group='libvirt-qemu'); path.chmod(0o600)
-        else:
-            shutil.chown(path, user='root', group='root'); path.chmod(0o700 if path.is_dir() else 0o600)
-    write_xml(xml, destination / 'domain.xml')
-    subprocess.run(['virt-xml-validate', str(destination / 'domain.xml'), 'domain'], check=True)
-    run('define', str(destination / 'domain.xml'))
+    try:
+        for disk in xml.findall('./devices/disk'):
+            source = disk.find('source')
+            if source is not None:
+                source.set('file', str(destination / source.get('file')))
+        for tag in ['loader', 'nvram']:
+            element = xml.find('./os/' + tag)
+            if element is not None and element.text:
+                if element.text not in m['sha256']:
+                    raise ValueError('Firmware/NVRAM is outside the verified bundle')
+                element.text = str(destination / element.text)
+        if xml.find('./os/nvram') is None:
+            ET.SubElement(xml.find('os'), 'nvram').text = str(destination / 'nvram.fd')
+        for label in list(xml.findall('seclabel')) + list(xml.findall('resource')):
+            xml.remove(label)
+        for audio in xml.findall('./devices/audio'):
+            audio.set('type', 'spice')
+        xml.find('./devices/emulator').text = '/usr/bin/qemu-system-x86_64'
+        nic = xml.find('./devices/interface'); nic.set('type', 'network')
+        for child in list(nic):
+            if child.tag in ['source', 'backend', 'target', 'script', 'filterref', 'portForward', 'virtualport']:
+                nic.remove(child)
+        ET.SubElement(nic, 'source', {'network': 'lab'})
+        for graphics in xml.findall('./devices/graphics'):
+            graphics.attrib = {'type': 'spice'}
+            for child in list(graphics):
+                graphics.remove(child)
+            ET.SubElement(graphics, 'listen', {'type': 'none'})
+        for element in xml.findall('./devices/channel/source') + xml.findall('./devices/serial/source') + xml.findall('./devices/console/source'):
+            element.attrib.pop('path', None)
+        for rng in xml.findall('./devices/rng/backend'):
+            rng.text = '/dev/urandom'
+        backend = xml.find('./devices/tpm/backend')
+        backend.find('source').set('path', str(destination / 'tpm'))
+        backend.set('persistent_state', 'yes')
+        # QEMU may write its disks, not the root-owned control XML or directory.
+        writable = {Path(e.get('file')) for e in xml.findall('./devices/disk/source')}
+        writable |= {Path(e.text) for e in [xml.find('./os/loader'), xml.find('./os/nvram')] if e is not None and e.text}
+        writable.add(destination / 'state.save')
+        for path in [destination, *destination.rglob('*')]:
+            if path == destination:
+                shutil.chown(path, user='root', group='root'); path.chmod(0o711)
+            elif path.is_relative_to(destination / 'tpm'):
+                shutil.chown(path, user='tss', group='tss'); path.chmod(0o700 if path.is_dir() else 0o600)
+            elif path in writable:
+                shutil.chown(path, user='libvirt-qemu', group='libvirt-qemu'); path.chmod(0o600)
+            else:
+                shutil.chown(path, user='root', group='root'); path.chmod(0o700 if path.is_dir() else 0o600)
+        write_xml(xml, destination / 'domain.xml')
+        subprocess.run(['virt-xml-validate', str(destination / 'domain.xml'), 'domain'], check=True)
+        run('define', str(destination / 'domain.xml'))
+    except BaseException:
+        # A failed response can still have defined a domain: retain its files then.
+        if name not in run('list', '--all', '--name').split():
+            (destination / 'domain.xml').write_bytes(original_xml)
+            destination.rename(args.directory)
+            for path in [args.directory, *args.directory.rglob('*')]:
+                shutil.chown(path, user='ubuntu', group='ubuntu')
+                path.chmod(0o700 if path.is_dir() else 0o600)
+        raise
     print('Imported', name, 'without starting it. Original sending-side bundle remains untouched.')
 
 
