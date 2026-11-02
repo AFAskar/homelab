@@ -368,6 +368,7 @@ def lifecycle(args):
         write_xml(saved_xml, directory / 'domain.xml')
         print('Guest RAM saved; disk, TPM and firmware remain on the data volume'); return
     if args.command == 'start':
+        subprocess.run(['systemctl', 'is-active', '--quiet', 'lab-firewall.service'], check=True)
         if state == 'running':
             print('Already running'); return
         if state != 'shut off':
