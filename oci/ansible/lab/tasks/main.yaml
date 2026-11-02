@@ -10,6 +10,19 @@
     name: [qemu-system-x86, qemu-system-gui, qemu-utils, libvirt-daemon-system, libvirt-clients, ovmf, swtpm, swtpm-tools, dnsmasq-base, iptables, python3, python3-lxml]
     state: present
     update_cache: true
+- name: Permit TPM state only in the private lab store
+  ansible.builtin.blockinfile:
+    path: /etc/apparmor.d/local/usr.bin.swtpm
+    create: true
+    mode: '0644'
+    marker: '# {mark} ANSIBLE NESTED LAB TPM'
+    block: |
+      owner /srv/pelican/lab/guests/*/tpm/ rw,
+      owner /srv/pelican/lab/guests/*/tpm/** rwk,
+  register: lab_tpm_apparmor
+- name: Reload the confined TPM profile when its local paths change
+  ansible.builtin.command: apparmor_parser -r /etc/apparmor.d/usr.bin.swtpm
+  when: lab_tpm_apparmor.changed
 - name: Verify hardware-accelerated KVM without rebooting or loading replacement modules
   ansible.builtin.command:
     argv: [python3, -c, "import os,fcntl; k=os.open('/dev/kvm',os.O_RDWR); assert fcntl.ioctl(k,0xAE00,0)==12; v=fcntl.ioctl(k,0xAE01,0); c=fcntl.ioctl(v,0xAE41,0); os.close(c); os.close(v); os.close(k)"]
