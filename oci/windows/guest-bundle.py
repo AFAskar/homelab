@@ -194,7 +194,7 @@ def image(args):
         <feature enabled='yes' name='secure-boot'/><feature enabled='yes' name='enrolled-keys'/>
       </firmware><boot dev='hd'/></os>
       <features><acpi/><apic/><smm state='on'/></features>
-      <cpu mode='custom' match='exact' check='full'><model fallback='forbid'>EPYC-Rome-v5</model><feature policy='disable' name='lbrv'/><feature policy='disable' name='tsc-scale'/><feature policy='disable' name='pause-filter'/><feature policy='disable' name='pfthreshold'/><feature policy='disable' name='v-vmsave-vmload'/><topology sockets='1' cores='4' threads='1'/></cpu>
+      <cpu mode='custom' match='exact' check='partial'><model fallback='forbid'>EPYC-Rome-v5</model><feature policy='disable' name='lbrv'/><feature policy='disable' name='tsc-scale'/><feature policy='disable' name='pause-filter'/><feature policy='disable' name='pfthreshold'/><feature policy='disable' name='v-vmsave-vmload'/><topology sockets='1' cores='4' threads='1'/></cpu>
       <clock offset='localtime'/><on_poweroff>destroy</on_poweroff><on_reboot>restart</on_reboot>
       <devices><emulator>/usr/bin/qemu-system-x86_64</emulator>
       <disk type='file' device='disk'><driver name='qemu' type='qcow2'/><source file='disk-0.qcow2'/><target dev='vda' bus='virtio'/></disk>
