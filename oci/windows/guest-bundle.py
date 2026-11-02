@@ -361,7 +361,13 @@ def lifecycle(args):
             raise ValueError('Existing RAM checkpoint is preserved; no overwrite allowed')
         checkpoint.touch(mode=0o600, exist_ok=False)
         shutil.chown(checkpoint, user='libvirt-qemu', group='libvirt-qemu')
-        run('save', name, str(checkpoint), capture=False)
+        try:
+            run('save', name, str(checkpoint), capture=False)
+        except BaseException:
+            # An empty placeholder contains no recoverable RAM. Preserve any data.
+            if checkpoint.exists() and checkpoint.stat().st_size == 0:
+                checkpoint.unlink()
+            raise
         # Store the resolved ABI (machine, PCI addresses, firmware), not the original template.
         saved_xml = ET.fromstring(run('save-image-dumpxml', str(checkpoint)))
         domain_ok(saved_xml)
