@@ -27,8 +27,26 @@ The configured API user belongs to the Default-domain Administrators group;
 the root Tenant Admin Policy grants that group management of tenancy
 resources. Use narrower bucket/operator policies where described in the
 README. Keep API keys, identity-domain responses and billing records private.
-Check current quota/image compatibility with `oci/scripts/preflight.py`
-(`--help` lists the required compartment, AD and Ubuntu image inputs).
+Check quota/image compatibility against a fresh saved Terraform plan. Set
+`COMPARTMENT_OCID`, `OCI_AD` and `UBUNTU_IMAGE_OCID` to the same values used by
+that plan, then run from the repository root:
+
+```bash
+umask 077
+mkdir -p oci/inventory
+terraform -chdir=oci/terraform plan -out=../inventory/review.tfplan
+terraform -chdir=oci/terraform show -json ../inventory/review.tfplan >oci/inventory/review-plan.json
+python3 oci/scripts/preflight.py --plan-json oci/inventory/review-plan.json \
+  --compartment "$COMPARTMENT_OCID" --ad "$OCI_AD" --ubuntu-image "$UBUNTU_IMAGE_OCID"
+```
+
+The report separates planned totals, verified live allocations and additional
+quota needed. Existing instances count only in the same shape/AD/compartment;
+[stopped instances still consume allocation](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/resource-billing-stopped-instances.htm). Planned downsizes/deletions do not
+provide headroom until executed, and replacements conservatively require full
+new capacity. Zero incremental demand needs no quota-availability query.
+Regenerate the plan after configuration or live-resource changes; keep its JSON
+private because it can contain sensitive values.
 Quota headroom does not reserve capacity. Recheck Always Free entitlements,
 prices and promotional expiry using the [cost procedure](costs.md).
 
