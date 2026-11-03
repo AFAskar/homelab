@@ -66,6 +66,21 @@ The active private node names use HTTPS 8080 and SFTP 2022. Paid nodes reserve 2
 
 The approved public game pool is **25565–25765 inclusive**, TCP and UDP, on every Wings node: 201 port numbers per node. `configure-panel.py` idempotently reserves that pool using each node's actual private VNIC IP, preserving occupied allocations. The existing acceptance game uses 25565; the other 200 allocations per node start free. OCI public IP is external NAT, not the Linux bind address. Store mappings from Panel allocation to public endpoint; ephemeral paid public IPs may change on replacement. For a new game inside this pool, select free primary/additional allocations in Panel, choose a compatible egg/runtime and resource limits, then install/start it. No further OCI or host-firewall change is needed for ports within the pool. Games needing ports outside it require a reviewed Terraform/Ansible update. The pool is available on every active node; do not use its public ports for RCON or other administrative listeners. Port numbers may be reused on different nodes, but two servers cannot own the same node/IP/port allocation. SSH/RDP/API/exporter/SFTP stay private. Verify public games using an external client independent of the tailnet. Check native ARM manifest/egg for Thor; x86-only games belong on paid AMD nodes.
 
+For Simple Voice Chat, assign an additional allocation to the Minecraft server
+(for example UDP 25566), set `port=25566` in
+`config/voicechat/voicechat-server.properties`, then gracefully restart that game
+server after saving the world. Editing the file or reserving an allocation does
+not move the running listener. Check the startup log for `Voice chat server
+started` and the selected port. Connect players using the node's public game
+address; the private subnet's administration grants do not include game ports.
+
+`Test-NetConnection -Port` tests TCP, so a failed TCP test on a UDP-only voice
+port is expected. Use the [official Simple Voice Chat UDP tester](https://github.com/henkelmax/svc-cli-utils)
+with `svc ping PUBLIC_IP:25566`, or run `/voicechat test PLAYERNAME` in-game.
+A valid UDP reply verifies the game path; a Docker port mapping alone does not
+prove that the application listens behind it.
+
+
 For the deployed acceptance workload, run `python3 oci/scripts/configure-panel.py --admin-email YOUR_ADMIN_EMAIL --test-games` from the repository root. The optional flag imports the reviewed declarative `oci/pelican/egg-mindustry-acceptance.json` and creates one server per node only if absent; it preserves existing servers. The pinned Mindustry v160.7 JAR and multiarch runtime run natively on both architectures. Run `python3 oci/scripts/check-games.py` from an external client to check TCP, real UDP discovery responses and absence of public administrative listeners. This verifies protocol responses, not an interactive player session.
 
 ## Backups and restores
