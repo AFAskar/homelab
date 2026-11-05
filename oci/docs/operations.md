@@ -80,29 +80,6 @@ with `svc ping PUBLIC_IP:25566`, or run `/voicechat test PLAYERNAME` in-game.
 A valid UDP reply verifies the game path; a Docker port mapping alone does not
 prove that the application listens behind it.
 
-For a fresh Chunky job that must stop when players return, install
-`oci/scripts/chunky-until-player.py` as `/usr/local/sbin/chunky-until-player`
-on the Wings host (root-owned, mode 0700). It requires the host's Python/PyYAML,
-Wings configuration, and trusted node TLS certificate. Start it as a transient
-service, substituting the server UUID, certificate DNS name, spawn X/Z and radius:
-
-```bash
-sudo systemd-run --unit=dndmc-chunky-until-player --collect --property=Restart=no \
-  /usr/bin/python3 -u /usr/local/sbin/chunky-until-player \
-  --server-uuid SERVER_UUID --tls-name NODE_CERTIFICATE_DNS_NAME \
-  --center SPAWN_X SPAWN_Z --radius 5000
-sudo journalctl -u dndmc-chunky-until-player -n 20 --no-pager
-```
-
-Run `chunky spawn` in the game console to read the current spawn center first.
-The watcher verifies an empty server before starting, follows player-join log
-messages, and polls `list` as a fallback. The first player join pauses the
-Overworld task and ends the watcher. It also attempts to pause if its player-count
-checks fail. It neither resumes after players leave nor starts after a host reboot.
-Use `chunky progress` to check the task and `chunky continue` to resume it manually;
-manual continuation does not reinstall the watcher. Do not run a second generator
-alongside Chunky or use this fresh-task command to replace a saved task.
-
 
 For the deployed acceptance workload, run `python3 oci/scripts/configure-panel.py --admin-email YOUR_ADMIN_EMAIL --test-games` from the repository root. The optional flag imports the reviewed declarative `oci/pelican/egg-mindustry-acceptance.json` and creates one server per node only if absent; it preserves existing servers. The pinned Mindustry v160.7 JAR and multiarch runtime run natively on both architectures. Run `python3 oci/scripts/check-games.py` from an external client to check TCP, real UDP discovery responses and absence of public administrative listeners. This verifies protocol responses, not an interactive player session.
 
