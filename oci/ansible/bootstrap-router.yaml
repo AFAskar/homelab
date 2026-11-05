@@ -1,0 +1,79 @@
+# Initial router access uses the existing Bitwarden-backed tailnet SSH path.
+# Run before site.yaml/private-IP inventory. No packages or listener changes
+# should be applied until the guest/access migration has been reviewed.
+- name: Prepare existing Thor router without removing tailnet SSH access
+  hosts: thor_bootstrap
+  become: true
+  pre_tasks:
+    - name: Require explicit listener migration and preserve known access
+      ansible.builtin.assert:
+        that:
+          - enable_private_ssh_listener | default(false)
+          - router_private_ip == '10.10.50.10'
+          - ansible_host == '100.89.233.80'
+  roles:
+    - tailscale
+  tasks:
+    - name: Install idempotent private SSH firewall rule
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/oci-private-ssh-rule
+        mode: '0750'
+        content: |
+          #!/bin/sh
+          set -eu
+          iptables -C INPUT -i tailscale0 -d {{ router_private_ip }} -p tcp --dport 22 -j ACCEPT 2>/dev/null || \
+            iptables -I INPUT 1 -i tailscale0 -d {{ router_private_ip }} -p tcp --dport 22 -j ACCEPT
+    - name: Persist private-IP SSH acceptance through the scoped firewall
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/oci-private-ssh-rule.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Permit private-IP SSH arriving through the existing tailnet
+          After=tailscaled.service ufw.service
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/oci-private-ssh-rule
+          RemainAfterExit=yes
+          [Install]
+          WantedBy=multi-user.target
+    - name: Enable private SSH firewall persistence
+      ansible.builtin.systemd_service:
+        name: oci-private-ssh-rule
+        state: started
+        enabled: true
+        daemon_reload: true
+    - name: Add private listener alongside the existing tailnet listener
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/71-oci-private.conf
+        mode: '0644'
+        content: |
+          # Additional listener; 70-tailscale-only.conf remains intact.
+          ListenAddress {{ router_private_ip }}
+      notify: Refresh SSH sockets
+    - name: Allow private-IP SSH through the existing host firewall
+      ansible.builtin.iptables:
+        chain: INPUT
+        destination: "{{ router_private_ip }}"
+        protocol: tcp
+        destination_port: '22'
+        in_interface: tailscale0
+        jump: ACCEPT
+        action: insert
+        rule_num: '1'
+    - name: Verify SSH daemon configuration before restart
+      ansible.builtin.command: /usr/sbin/sshd -t
+      changed_when: false
+    - name: Apply SSH listeners while keeping existing sessions
+      ansible.builtin.meta: flush_handlers
+  handlers:
+    - name: Refresh SSH sockets
+      ansible.builtin.systemd_service:
+        name: ssh.socket
+        state: restarted
+        daemon_reload: true
+      notify: Refresh SSH daemon
+    - name: Refresh SSH daemon
+      ansible.builtin.systemd_service:
+        name: ssh
+        state: restarted

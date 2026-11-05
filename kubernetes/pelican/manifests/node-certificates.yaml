@@ -1,0 +1,59 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wings-01
+spec:
+  secretName: wings-01-tls
+  dnsNames:
+  - wings-01.oci.home.internal
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wings-02
+spec:
+  secretName: wings-02-tls
+  dnsNames:
+  - wings-02.oci.home.internal
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wings-03
+spec:
+  secretName: wings-03-tls
+  dnsNames:
+  - wings-03.oci.home.internal
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wings-04
+spec:
+  secretName: wings-04-tls
+  dnsNames:
+  - wings-04.oci.home.internal
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: panel-proxy
+spec:
+  secretName: panel-proxy-tls
+  dnsNames:
+  - pelican.home.internal
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer

@@ -1,0 +1,6 @@
+bucket              = "REPLACE-existing-private-versioned-state-bucket"
+namespace           = "REPLACE"
+region              = "REPLACE"
+key                 = "homelab/oci/terraform.tfstate"
+config_file_profile = "DEFAULT"
+# Credentials remain in OCI profile/environment, not this file.

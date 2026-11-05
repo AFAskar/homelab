@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pelican
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pelican
+  template:
+    metadata:
+      labels:
+        app: pelican
+    spec:
+      # Resolve private FQDNs before Kubernetes/tailnet search suffixes.
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "1"
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 82
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: '0'
+      initContainers:
+      - name: volume-permissions
+        image: ghcr.io/pelican/panel:v1.0.0-rc.2@sha256:cb717c15da9bcdc93f22a22a02d5460a1ce51fd03f2975b4ce53d745f4cc9ac8
+        command:
+        - /bin/sh
+        - -ec
+        - mkdir -p /pelican-data/logs; chown -R 82:82 /pelican-data; chmod 0770 /pelican-data
+        securityContext:
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - name: data
+          mountPath: /pelican-data
+      - name: ca-bundle
+        image: ghcr.io/pelican/panel:v1.0.0-rc.2@sha256:cb717c15da9bcdc93f22a22a02d5460a1ce51fd03f2975b4ce53d745f4cc9ac8
+        command:
+        - /bin/sh
+        - -ec
+        - cat /etc/ssl/certs/ca-certificates.crt /homelab-ca/homelab-root-ca.crt >
+          /trust/ca-certificates.crt; chmod 0644 /trust/ca-certificates.crt
+        securityContext:
+          runAsUser: 82
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: trust
+          mountPath: /trust
+        - name: homelab-ca
+          mountPath: /homelab-ca
+          readOnly: true
+      containers:
+      - name: panel
+        image: ghcr.io/pelican/panel:v1.0.0-rc.2@sha256:cb717c15da9bcdc93f22a22a02d5460a1ce51fd03f2975b4ce53d745f4cc9ac8
+        ports:
+        - name: http
+          containerPort: 80
+        env:
+        - name: APP_URL
+          value: https://pelican.home.internal
+        - name: BEHIND_PROXY
+          value: 'true'
+        - name: TRUSTED_PROXIES
+          value: 10.42.0.0/16
+        - name: XDG_DATA_HOME
+          value: /pelican-data
+        - name: DB_CONNECTION
+          value: sqlite
+        - name: DB_DATABASE
+          value: /pelican-data/database/database.sqlite
+        - name: CACHE_STORE
+          value: file
+        - name: SESSION_DRIVER
+          value: file
+        - name: QUEUE_CONNECTION
+          value: database
+        - name: APP_ENV
+          value: production
+        - name: APP_DEBUG
+          value: 'false'
+        envFrom:
+        - secretRef:
+            name: pelican-env
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        securityContext:
+          runAsUser: 82
+          runAsGroup: 82
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        startupProbe:
+          tcpSocket:
+            port: http
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          exec:
+            command: [/bin/ash, /healthcheck.sh]
+          timeoutSeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: http
+          periodSeconds: 30
+          failureThreshold: 5
+        volumeMounts:
+        - name: data
+          mountPath: /pelican-data
+        - name: data
+          mountPath: /var/www/html/storage/logs
+          subPath: logs
+        - name: trust
+          mountPath: /etc/ssl/certs/ca-certificates.crt
+          subPath: ca-certificates.crt
+          readOnly: true
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: pelican-data
+      - name: trust
+        emptyDir: {}
+      - name: homelab-ca
+        configMap:
+          name: homelab-ca

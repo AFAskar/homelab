@@ -1,0 +1,24 @@
+[Unit]
+Description=AdGuard Home DNS resolver
+
+[Container]
+Image={{ adguard_image }}
+ContainerName=adguardhome
+Network=pasta
+PublishPort={{ adguard_lan_ip }}:5353:53/tcp
+PublishPort={{ adguard_lan_ip }}:5353:53/udp
+PublishPort={{ adguard_lan_ip }}:3000:3000/tcp
+PublishPort={{ adguard_tailnet_ip }}:5353:53/tcp
+PublishPort={{ adguard_tailnet_ip }}:5353:53/udp
+PublishPort={{ adguard_tailnet_ip }}:3000:3000/tcp
+Volume={{ adguard_work_directory }}:/opt/adguardhome/work:Z
+Volume={{ adguard_config_directory }}:/opt/adguardhome/conf:Z
+
+[Service]
+ExecStartPre=/usr/bin/tailscale wait --timeout=60s
+Restart=always
+RestartSec=10s
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target

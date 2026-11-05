@@ -1,0 +1,215 @@
+- name: Validate discovered OS and preserve existing data
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.architecture in ['x86_64', 'aarch64']
+      - wings_new_data_volume or retained_data_reviewed
+      - docker_ce_version is defined
+      - containerd_version is defined
+    fail_msg: Review actual OS, storage and Docker conflicts first; this role currently supports Ubuntu only.
+- name: Select native binary architecture
+  ansible.builtin.set_fact:
+    wings_arch: "{{ 'amd64' if ansible_facts.architecture == 'x86_64' else 'arm64' }}"
+- name: Install OS dependencies
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, gnupg, iptables, e2fsprogs, python3, prometheus-node-exporter]
+    state: present
+    update_cache: true
+- name: Create repository key directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+- name: Fetch official Docker key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+- name: Install Docker repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ wings_arch }} signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable
+    filename: docker
+    state: present
+- name: Install explicitly selected Docker CE versions
+  ansible.builtin.apt:
+    name:
+      - "docker-ce={{ docker_ce_version }}"
+      - "docker-ce-cli={{ docker_ce_version }}"
+      - "containerd.io={{ containerd_version }}"
+    state: present
+    update_cache: true
+- name: Hold Docker packages for controlled upgrades
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [docker-ce, docker-ce-cli, containerd.io]
+- name: Configure only identified new paid-node volume
+  ansible.builtin.include_tasks: storage.yaml
+  when: wings_new_data_volume
+- name: Create service directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  # systemd owns /run/wings through RuntimeDirectory in the service unit.
+  loop: [/etc/pelican, /etc/pelican/tls, /var/lib/pelican, /var/log/pelican]
+- name: Install homelab root CA for Wings Panel callbacks
+  ansible.builtin.copy:
+    src: "{{ homelab_ca_local }}"
+    dest: /usr/local/share/ca-certificates/homelab-root-ca.crt
+    mode: '0644'
+  register: wings_ca
+  notify: Refresh CA trust
+- name: Resolve private Panel callback through the OCI router
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '.*\s+pelican\.home\.internal$'
+    line: "{{ router_private_ip }} pelican.home.internal"
+- name: Refresh trusted CAs before Wings can start or restart
+  ansible.builtin.meta: flush_handlers
+- name: Download pinned native Wings binary with release digest
+  ansible.builtin.get_url:
+    url: "https://github.com/pelican-dev/wings/releases/download/{{ wings_version }}/wings_linux_{{ wings_arch }}"
+    dest: /usr/local/bin/wings
+    checksum: "sha256:{{ wings_checksums[wings_arch] }}"
+    mode: '0755'
+  notify: Restart wings
+- name: Inspect current Wings configuration
+  ansible.builtin.stat:
+    path: /etc/pelican/config.yml
+    get_checksum: false
+  register: wings_config_stat
+- name: Read current configuration without logging tokens
+  ansible.builtin.slurp:
+    src: /etc/pelican/config.yml
+  register: wings_previous_config
+  when: wings_config_stat.stat.exists
+  no_log: true
+- name: Compare managed fields while preserving Wings-generated defaults
+  ansible.builtin.set_fact:
+    wings_desired_config: "{{ lookup('file', wings_config_local) | from_yaml }}"
+    wings_current_config: "{{ wings_previous_config.content | default('e30=') | b64decode | from_yaml | default({}, true) }}"
+  no_log: true
+- name: Reconcile changed Panel fields without rewriting generated defaults
+  ansible.builtin.copy:
+    content: "{{ wings_current_config | combine(wings_desired_config, recursive=true) | to_nice_yaml }}"
+    dest: /etc/pelican/config.yml
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  when: wings_current_config | combine(wings_desired_config, recursive=true) != wings_current_config
+  notify: Restart wings
+- name: Protect the installed configuration even when its content is unchanged
+  ansible.builtin.file:
+    path: /etc/pelican/config.yml
+    owner: root
+    group: root
+    mode: '0600'
+- name: Read installed Wings config for data path and TLS checks
+  ansible.builtin.slurp:
+    src: /etc/pelican/config.yml
+  register: installed_wings_config
+  no_log: true
+- name: Require game data on the paid data volume and TLS for HTTPS Panel
+  ansible.builtin.assert:
+    that:
+      - (installed_wings_config.content | b64decode | from_yaml).api.ssl.enabled
+      - not wings_new_data_volume or (installed_wings_config.content | b64decode | from_yaml).system.data == wings_data_mount + '/volumes'
+    fail_msg: Set Panel node data path to /srv/pelican/volumes on paid nodes and enable Wings TLS.
+  no_log: true
+- name: Copy per-node private TLS certificate and key
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0600'
+  loop:
+    - {src: "{{ wings_tls_cert_local }}", dest: /etc/pelican/tls/tls.crt}
+    - {src: "{{ wings_tls_key_local }}", dest: /etc/pelican/tls/tls.key}
+  no_log: true
+  notify: Restart wings
+- name: Install Wings systemd unit
+  ansible.builtin.template:
+    src: wings.service.j2
+    dest: /etc/systemd/system/wings.service
+    mode: '0644'
+  notify: Restart wings
+- name: Restart Wings with refreshed CA roots after its unit is installed # noqa: no-handler
+  # CA trust handlers must flush earlier; this restart must wait for the unit.
+  ansible.builtin.systemd_service:
+    name: wings
+    state: restarted
+    daemon_reload: true
+  when: wings_ca.changed
+- name: Enable Docker and Wings across reboots
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: [docker, wings, prometheus-node-exporter]
+- name: Gate removal of public administrative access
+  ansible.builtin.assert:
+    that:
+      - private_access_verified
+      - wings_public_interface != 'REPLACE_DISCOVERED_INTERFACE'
+      - admin_source_cidrs | length > 0
+      - router_source_cidrs | length > 0
+  when: apply_private_firewall
+- name: Install scoped firewall script
+  ansible.builtin.template:
+    src: firewall.sh.j2
+    dest: /usr/local/sbin/pelican-firewall
+    mode: '0750'
+  when: apply_private_firewall
+  notify: Restart firewall
+- name: Install persistent firewall unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/pelican-firewall.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Pelican scoped host and Docker forwarding rules
+      After=docker.service tailscaled.service
+      Requires=docker.service
+      PartOf=docker.service
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/pelican-firewall
+      RemainAfterExit=yes
+      [Install]
+      WantedBy=multi-user.target
+  when: apply_private_firewall
+  notify: Restart firewall
+- name: Enable persistent firewall after private access verification
+  ansible.builtin.systemd_service:
+    name: pelican-firewall
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: apply_private_firewall
+- name: Limit persistent journal disk consumption
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: '0755'
+- name: Configure bounded service logs
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/pelican.conf
+    mode: '0644'
+    content: |
+      [Journal]
+      SystemMaxUse=200M
+      MaxRetentionSec=14day
+  notify: Restart journald
+- name: Enable service health metrics on node exporter
+  ansible.builtin.copy:
+    dest: /etc/default/prometheus-node-exporter
+    mode: '0644'
+    content: |
+      ARGS="--collector.systemd --collector.systemd.unit-include=wings.service|docker.service|tailscaled.service|caddy.service"
+  notify: Restart node exporter

@@ -1,0 +1,10 @@
+- name: Configure Wings after reviewed infrastructure import and deployment
+  hosts: wings
+  become: true
+  roles:
+    - wings
+- name: Configure existing primary or explicitly selected secondary router
+  hosts: subnet_routers
+  become: true
+  roles:
+    - tailscale

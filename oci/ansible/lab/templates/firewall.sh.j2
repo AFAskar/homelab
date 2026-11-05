@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Replace only LAB-* rules atomically; preserve existing Docker/Wings chains.
+set -euo pipefail
+exec 9>/run/lock/lab-firewall.lock
+flock 9
+uplink={{ ansible_facts.default_ipv4.interface | quote }}
+bridge={{ lab_bridge | quote }}
+host_ip={{ lab_private_ip | quote }}
+guest_ip={{ lab_guest_ip | quote }}
+guest_net={{ lab_guest_subnet | quote }}
+gateway={{ lab_gateway_ip | quote }}
+# Remove/reinsert only exact jumps owned by this script, in the same transaction.
+replace_jump() {
+  local table=$1 chain=$2 expected=$3 insertion=$4 line
+  while IFS= read -r line; do
+    if [[ $line == "$expected" ]]; then printf '%s\n' "${line/#-A /-D }"; fi
+  done < <(iptables -w -t "$table" -S "$chain")
+  printf '%s\n' "$insertion"
+}
+{
+  echo '*filter'
+  echo ':LAB-INPUT - [0:0]'
+  echo ':LAB-FORWARD - [0:0]'
+  echo '-F LAB-INPUT'
+  echo '-F LAB-FORWARD'
+  echo '-A LAB-INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'
+  echo '-A LAB-INPUT -p udp --sport 68 --dport 67 -j ACCEPT'
+  for proto in tcp udp; do
+    echo "-A LAB-INPUT -s $guest_net -d $gateway -p $proto --dport 53 -j ACCEPT"
+  done
+  echo '-A LAB-INPUT -j DROP'
+  echo '-A LAB-FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'
+{% for router in lab_router_sources %}
+  echo "-A LAB-FORWARD -i $uplink -o $bridge -s {{ router }} -d $guest_ip -p tcp --dport 3389 -j ACCEPT"
+{% endfor %}
+  for cidr in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4; do
+    echo "-A LAB-FORWARD -i $bridge -d $cidr -j DROP"
+  done
+  echo "-A LAB-FORWARD -i $bridge -o $uplink -s $guest_net -j ACCEPT"
+  echo '-A LAB-FORWARD -j DROP'
+  replace_jump filter INPUT "-A INPUT -i $bridge -j LAB-INPUT" "-I INPUT 1 -i $bridge -j LAB-INPUT"
+  for direction in -i -o; do
+    replace_jump filter FORWARD "-A FORWARD $direction $bridge -j LAB-FORWARD" "-I FORWARD 1 $direction $bridge -j LAB-FORWARD"
+  done
+  echo COMMIT
+} | iptables-restore --wait --noflush
+{
+  echo '*nat'
+  echo ':LAB-PREROUTING - [0:0]'
+  echo ':LAB-POSTROUTING - [0:0]'
+  echo '-F LAB-PREROUTING'
+  echo '-F LAB-POSTROUTING'
+{% for router in lab_router_sources %}
+  echo "-A LAB-PREROUTING -i $uplink -s {{ router }} -d $host_ip -p tcp --dport 3389 -j DNAT --to-destination $guest_ip:3389"
+{% endfor %}
+  echo "-A LAB-POSTROUTING -o $bridge -d $guest_ip -p tcp --dport 3389 -m conntrack --ctorigdst $host_ip --ctorigdstport 3389 -j SNAT --to-source $gateway"
+  echo "-A LAB-POSTROUTING -o $uplink -s $guest_net -j MASQUERADE"
+  for chain in PREROUTING POSTROUTING; do
+    replace_jump nat "$chain" "-A $chain -j LAB-$chain" "-I $chain 1 -j LAB-$chain"
+  done
+  echo COMMIT
+} | iptables-restore --wait --noflush
+for chain in INPUT FORWARD; do
+  ip6tables -w -C "$chain" -i "$bridge" -j DROP 2>/dev/null || ip6tables -w -I "$chain" 1 -i "$bridge" -j DROP
+done
+ip6tables -w -C FORWARD -o "$bridge" -j DROP 2>/dev/null || ip6tables -w -I FORWARD 1 -o "$bridge" -j DROP

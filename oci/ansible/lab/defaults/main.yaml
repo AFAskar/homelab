@@ -1,0 +1,6 @@
+lab_private_ip: "{{ ansible_host }}"
+lab_router_sources: "{{ router_source_cidrs }}"
+lab_bridge: virbr-lab
+lab_guest_ip: 192.168.124.10
+lab_gateway_ip: 192.168.124.1
+lab_guest_subnet: 192.168.124.0/24

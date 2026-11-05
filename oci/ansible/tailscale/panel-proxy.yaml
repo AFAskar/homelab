@@ -1,0 +1,68 @@
+# Include this playbook after tailscale/site.yaml; uses the existing router.
+- name: Proxy private Wings callbacks to the homelab Panel over the tailnet
+  hosts: subnet_routers
+  become: true
+  tasks:
+    - name: Require discovered Ubuntu and provisioned CA material
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Ubuntu'
+          - panel_proxy_certificate_local is defined
+          - panel_proxy_key_local is defined
+          - homelab_ca_local is defined
+    - name: Install Caddy from Ubuntu archive
+      ansible.builtin.apt:
+        name: caddy
+        state: present
+    - name: Create private proxy certificate directory
+      ansible.builtin.file:
+        path: /etc/caddy/pki
+        state: directory
+        owner: caddy
+        group: caddy
+        mode: '0750'
+    - name: Install proxy TLS and upstream CA material
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: caddy
+        group: caddy
+        mode: '0600'
+      loop:
+        - {src: "{{ panel_proxy_certificate_local }}", dest: /etc/caddy/pki/panel.crt}
+        - {src: "{{ panel_proxy_key_local }}", dest: /etc/caddy/pki/panel.key}
+        - {src: "{{ homelab_ca_local }}", dest: /etc/caddy/pki/homelab-ca.crt}
+      no_log: true
+      notify: Restart caddy
+    - name: Configure TLS callback proxy using existing pos tailnet address
+      ansible.builtin.copy:
+        dest: /etc/caddy/Caddyfile
+        validate: /usr/bin/caddy validate --config %s --adapter caddyfile
+        mode: '0644'
+        content: |
+          {
+            admin off
+            auto_https off
+          }
+          https://pelican.home.internal {
+            bind {{ router_private_ip }}
+            tls /etc/caddy/pki/panel.crt /etc/caddy/pki/panel.key
+            reverse_proxy https://100.114.113.82:8443 {
+              header_up Host pelican.home.internal
+              transport http {
+                tls_server_name pelican.home.internal
+                tls_trusted_ca_certs /etc/caddy/pki/homelab-ca.crt
+              }
+            }
+          }
+      notify: Restart caddy
+    - name: Enable Caddy persistence
+      ansible.builtin.systemd_service:
+        name: caddy
+        state: started
+        enabled: true
+  handlers:
+    - name: Restart caddy
+      ansible.builtin.systemd_service:
+        name: caddy
+        state: restarted
