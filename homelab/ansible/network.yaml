@@ -26,6 +26,15 @@
     - name: Check the generated interfaces without changing links
       ansible.builtin.command: ifquery --list
       changed_when: false
+    - name: Allow valid asymmetric replies while retaining both LAN interfaces
+      ansible.posix.sysctl:
+        name: 'net.ipv4.conf.{{ item }}.rp_filter'
+        value: '2'
+        sysctl_file: /etc/sysctl.d/60-homelab-multihome.conf
+        sysctl_set: true
+        reload: true
+      loop: [all, default, eth0, wlan0]
+      when: pi_network_apply | bool
     - name: Read the current LAN route
       ansible.builtin.command: ip -4 route get 192.168.1.28
       register: pi_current_route
@@ -43,9 +52,23 @@
       ansible.builtin.reboot:
         reboot_timeout: 240
       when: pi_network_reboot | bool
-    - name: Verify the wired path after reboot
+    - name: Verify LAN routing prefers Ethernet
       ansible.builtin.command: ip route get 192.168.1.28
       register: pi_wired_route
       changed_when: false
       failed_when: "'dev eth0' not in pi_wired_route.stdout"
       when: pi_network_apply | bool
+    - name: Verify the wired gateway before removing temporary Wi-Fi preference
+      ansible.builtin.command: ping -I eth0 -c 1 -W 2 192.168.1.1
+      changed_when: false
+      when: pi_network_apply | bool
+    - name: Read Wi-Fi default routes
+      ansible.builtin.command: ip -4 route show default dev wlan0
+      register: pi_wifi_defaults
+      changed_when: false
+    - name: Remove the temporary recovery preference after wired access works
+      ansible.builtin.command: ip -4 route del default dev wlan0 metric 1
+      changed_when: true
+      when:
+        - pi_network_apply | bool
+        - pi_wifi_defaults.stdout_lines | select('search', 'metric 1($| )') | list | length > 0

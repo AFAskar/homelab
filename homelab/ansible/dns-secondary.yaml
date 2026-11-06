@@ -33,6 +33,13 @@
       community.general.apk:
         name: [ca-certificates, tar, iptables]
         state: present
+    - name: Create the native administration script directory
+      ansible.builtin.file:
+        path: /usr/local/sbin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
     - name: Load the same encrypted settings and OCI records as POS
       ansible.builtin.include_tasks: ../../docker/adguardhome/settings.yaml
     - name: Refuse unexpected DHCP or TLS listeners on a DNS replica

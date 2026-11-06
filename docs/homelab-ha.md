@@ -118,6 +118,9 @@ Before reservation, the network play can retain Ethernet DHCP by keeping
 `pi_wired_static: false`. Wi-Fi's default and connected routes use metric 600
 so Ethernet is preferred. `readiness.py --allow-sdcard` evaluates the selected
 SD-card setup without treating the absence of an SSD as an unresolved choice.
+The network play sets loose reverse-path validation (`rp_filter=2`) for the
+two LAN interfaces so valid replies are not dropped merely because they use
+different interfaces. See the [kernel's asymmetric-routing guidance](https://docs.kernel.org/networking/ip-sysctl.html).
 
 ## Deploy independent DNS
 

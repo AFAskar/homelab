@@ -16,3 +16,16 @@
         owner: root
         group: root
         mode: '0700'
+    - name: Mount and persist cgroup v2 before starting a k3s server
+      ansible.builtin.service:
+        name: cgroups
+        state: started
+        enabled: true
+        runlevel: boot
+    - name: Create the native administration script directory on Alpine
+      ansible.builtin.file:
+        path: /usr/local/sbin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
