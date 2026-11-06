@@ -1,0 +1,29 @@
+- name: Decrypt desired AdGuard settings only in operator memory
+  ansible.builtin.command:
+    argv: [sops, --decrypt, "{{ adguard_repository_root }}/docker/adguardhome/AdGuardHome.secret.sops.yaml"]
+  delegate_to: localhost
+  become: false
+  register: adguard_decrypted
+  changed_when: false
+  no_log: true
+- name: Load complete desired settings and tracked OCI endpoints
+  ansible.builtin.set_fact:
+    adguard_source: "{{ (adguard_decrypted.stdout | from_yaml).data['AdGuardHome.yaml'] | from_yaml }}"
+    adguard_endpoints: "{{ (lookup('file', adguard_repository_root + '/kubernetes/pelican/manifests/wings-endpoints.yaml') | from_yaml).endpoints }}"
+  no_log: true
+- name: Build OCI hostname rules from desired monitoring endpoints
+  ansible.builtin.set_fact:
+    adguard_wings_rules: >-
+      {{ (adguard_wings_rules | default([])) +
+         ['||' + item.hostname + '.oci.home.internal^$dnsrewrite=NOERROR;A;' + item.addresses[0]] }}
+  loop: "{{ adguard_endpoints }}"
+  loop_control:
+    label: "{{ item.hostname }}"
+- name: Reconcile derived records with the encrypted settings
+  ansible.builtin.set_fact:
+    adguard_desired: >-
+      {{ adguard_source | combine({'user_rules':
+         (adguard_source.user_rules | default([]) |
+          reject('match', '^[|][|]wings-0[1-4][.]oci[.]home[.]internal') | list) +
+         (adguard_wings_rules | default([]))}) }}
+  no_log: true
