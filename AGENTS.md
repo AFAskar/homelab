@@ -66,8 +66,9 @@ TPM, Secure Boot and access checks in scope.
 - Write documentation as actionable setup, configuration, operations, checks
   and recovery instructions. Keep required inventory facts and dated pricing
   sources where they help operate the environment.
-- Put implementation summaries, review discussion, test pass/fail reports and
-  incident timelines in PR descriptions/comments, not operator documentation.
+- Keep implementation summaries and relevant validation results in PR descriptions,
+  not operator documentation. Put review discussion and incident timelines in
+  appropriate comments rather than the PR description.
 - Keep generated evidence, state, plans and raw run logs ignored and private.
 
 # Publication privacy and PR attribution
@@ -90,3 +91,15 @@ TPM, Secure Boot and access checks in scope.
   "Created by Codex on behalf of @AFAskar."
   Preserve that attribution when updating the description; do not imply the user
   personally authored the agent's work.
+
+# PR descriptions and review replies
+
+- Describe the PR's resulting behavior and scope. Include validation performed,
+  the observed results of any live validation, and relevant gaps outside scope.
+  State the limits of the validation; do not imply service-outage tests prove
+  whole-host or storage failover.
+- Reply to CodeRabbit and other review findings in their original review threads,
+  explaining the fix and relevant validation or why no change is warranted.
+  For a finding outside a thread, post a comment linked to the original review.
+- Do not put review-fix inventories, bot status, review conversations or responses
+  to findings in the PR description. Preserve the required agent attribution.
