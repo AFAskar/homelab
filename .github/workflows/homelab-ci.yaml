@@ -1,0 +1,61 @@
+name: Homelab CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homelab-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ansible:
+    name: Tests and Ansible
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - name: Install validation dependencies
+        run: |
+          python -m pip install -r homelab/ci/requirements.txt
+          ansible-galaxy collection install -r oci/ansible/requirements.yaml
+      - name: Run offline tests, production lint and playbook syntax checks
+        run: bash homelab/ci/check-ansible.sh
+
+  coredns:
+    name: CoreDNS manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install verified manifest validation tools
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            https://dl.k8s.io/release/v1.36.5/bin/linux/amd64/kubectl -o kubectl
+          echo '33bc88a24c3b09cf55bfd59e6ca977881b61fc3f25ab65bc80c65b430248648e  kubectl' | sha256sum --check
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
+          echo '9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform.tar.gz' | sha256sum --check
+          tar -xzf kubeconform.tar.gz kubeconform
+          chmod +x kubectl kubeconform
+          mkdir -p "$RUNNER_TEMP/homelab-ci-bin"
+          mv kubectl kubeconform "$RUNNER_TEMP/homelab-ci-bin/"
+          echo "$RUNNER_TEMP/homelab-ci-bin" >> "$GITHUB_PATH"
+      - name: Render and strictly validate the base and HA overlay
+        run: |
+          for path in kubernetes/coredns/manifests kubernetes/coredns/overlays/ha; do
+            kubectl kustomize "$path" | kubeconform -strict -summary -kubernetes-version 1.36.0
+          done
