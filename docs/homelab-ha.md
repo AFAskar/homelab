@@ -79,6 +79,8 @@ disabled on both AdGuard instances. The Pi uses a digest-pinned ARM64 binary,
 an explicit unprivileged account/group and an OpenRC service.
 
 ```sh
+# Run from the repository root, including in a new shell.
+export ANSIBLE_CONFIG="$PWD/homelab/ansible/ansible.cfg"
 ansible-playbook homelab/ansible/cluster.yaml
 ansible-playbook -i pos, docker/adguardhome/deploy.yaml
 ansible-playbook homelab/ansible/dns-secondary.yaml
