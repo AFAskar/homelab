@@ -68,7 +68,7 @@ Add `--ask-become-pass` if doas needs authentication. The preparation installs
 Python/SFTP tools, enables cgroups at boot and creates the empty join directory.
 The network play prefers Ethernet and keeps Wi-Fi recovery at 192.168.1.18.
 Loose reverse-path validation supports both interfaces on the same subnet.
-The Pi server unit makes its root mount shared before k3s starts, as required
+The Alpine server unit makes its root mount shared before k3s starts, as required
 by the node exporter's read-only HostToContainer mount.
 
 ## Deploy and reconcile
