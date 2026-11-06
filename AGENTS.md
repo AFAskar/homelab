@@ -69,3 +69,24 @@ TPM, Secure Boot and access checks in scope.
 - Put implementation summaries, review discussion, test pass/fail reports and
   incident timelines in PR descriptions/comments, not operator documentation.
 - Keep generated evidence, state, plans and raw run logs ignored and private.
+
+# Publication privacy and PR attribution
+
+- Treat information learned while inspecting the user's environment as private
+  by default. Access to inspect a system is not permission to publish its details.
+- Include only information directly necessary to implement, review or operate
+  the change. Do not publish surrounding hardware identifiers, vendor/model or
+  firmware details, unrelated network configuration, account information,
+  screenshots, discovery notes or troubleshooting conversation in repository
+  files, commit messages, PR descriptions or comments.
+- Keep necessary deployment configuration scoped to the managed resources;
+  describe external prerequisites generically. Keep environment-specific
+  inspection evidence in ignored private storage. Ask before publishing private
+  information when its disclosure is actually required for the requested work.
+- Before committing or publishing, inspect the staged diff and outgoing PR text
+  for unnecessary environment details. A PR must describe its change and relevant
+  validation, not the surrounding environment or conversation history.
+- Every PR created by the agent must state clearly in its description:
+  "Created by Codex on behalf of @AFAskar."
+  Preserve that attribution when updating the description; do not imply the user
+  personally authored the agent's work.
