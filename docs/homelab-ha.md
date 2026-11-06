@@ -34,6 +34,24 @@ recovery. A foreign standalone cluster must be explicitly retired before joining
 POS. The join preflight refuses a different server/agent CA or unidentified
 existing datastore; it never runs an uninstall or cluster-reset script.
 
+A replacement Pi also needs the ARM64 k3s binary at `/usr/local/bin/k3s` before
+running the cluster play. On the Pi, download the version selected in inventory
+and verify the release checksum before installing it (do not start a standalone
+cluster):
+
+```sh
+doas apk add --no-cache curl
+version='v1.36.2+k3s1' # Keep aligned with k3s_version in inventory.yaml.
+workdir=$(mktemp -d)
+cd "$workdir"
+curl -fLO "https://github.com/k3s-io/k3s/releases/download/$version/k3s-arm64"
+curl -fLO "https://github.com/k3s-io/k3s/releases/download/$version/sha256sum-arm64.txt"
+grep ' k3s-arm64$' sha256sum-arm64.txt | sha256sum -c - &&
+  doas install -m 0755 k3s-arm64 /usr/local/bin/k3s
+/usr/local/bin/k3s --version
+cd / && rm -rf "$workdir"
+```
+
 From the repository root, using the Python environment where Ansible is installed:
 
 ```sh
