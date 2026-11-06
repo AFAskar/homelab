@@ -43,9 +43,16 @@
         argv: [ip, -4, route, replace, 192.168.1.0/24, dev, wlan0, src, '{{ pi_wifi_recovery_address }}', metric, '600']
       when: pi_network_apply | bool and 'dev eth0' not in pi_current_route.stdout
       changed_when: true
+    - name: Inspect Wi-Fi connected routes before deleting a zero-metric route
+      ansible.builtin.command: ip -4 route show exact 192.168.1.0/24 dev wlan0
+      register: pi_wifi_connected
+      changed_when: false
     - name: Remove only the competing zero-metric Wi-Fi connected route
       ansible.builtin.command: ip -4 route del 192.168.1.0/24 dev wlan0 metric 0
-      when: pi_network_apply | bool and 'dev eth0' not in pi_current_route.stdout
+      when:
+        - pi_network_apply | bool
+        - "'dev eth0' not in pi_current_route.stdout"
+        - pi_wifi_connected.stdout_lines | reject('search', ' metric [1-9]') | list | length > 0
       changed_when: true
     - name: Apply a static address through an explicitly selected reboot
       ansible.builtin.reboot:

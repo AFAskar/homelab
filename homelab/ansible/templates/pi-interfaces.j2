@@ -23,7 +23,7 @@ iface wlan0 inet static
     gateway 192.168.1.1
     metric 600
     post-up ip -4 route replace 192.168.1.0/24 dev wlan0 src {{ pi_wifi_recovery_address }} metric 600
-    post-up ip -4 route del 192.168.1.0/24 dev wlan0 metric 0 || true
+    post-up if ip -4 route show exact 192.168.1.0/24 dev wlan0 | grep -qv ' metric [1-9]'; then ip -4 route del 192.168.1.0/24 dev wlan0 metric 0; fi
 iface wlan0 inet6 manual
     up ip link set $IFACE up
     down ip link set $IFACE down
