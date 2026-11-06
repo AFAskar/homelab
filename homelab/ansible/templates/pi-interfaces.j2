@@ -3,10 +3,15 @@ iface lo inet loopback
 iface lo inet6 loopback
 
 auto eth0
+{% if pi_wired_static %}
 iface eth0 inet static
     address {{ node_ip }}/24
     gateway 192.168.1.1
     metric 100
+{% else %}
+iface eth0 inet dhcp
+    metric 100
+{% endif %}
 iface eth0 inet6 manual
     up ip link set $IFACE up
     down ip link set $IFACE down
@@ -17,6 +22,8 @@ iface wlan0 inet static
     address {{ pi_wifi_recovery_address }}/24
     gateway 192.168.1.1
     metric 600
+    post-up ip -4 route replace 192.168.1.0/24 dev wlan0 src {{ pi_wifi_recovery_address }} metric 600
+    post-up ip -4 route del 192.168.1.0/24 dev wlan0 metric 0 || true
 iface wlan0 inet6 manual
     up ip link set $IFACE up
     down ip link set $IFACE down

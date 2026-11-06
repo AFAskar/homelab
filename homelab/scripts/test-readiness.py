@@ -29,6 +29,11 @@ class ReadinessTests(unittest.TestCase):
         facts['kernel_cmdline'] = 'cgroup_disable=memory cgroup_enable=memory'
         self.assertEqual(readiness.assess(facts, 'v1.36.2+k3s1')['control_plane_prerequisites'], [])
 
+    def test_sd_can_be_explicitly_selected(self):
+        facts = self.facts()
+        facts['data_device'] = '/dev/mmcblk0p2'
+        self.assertEqual(readiness.assess(facts, 'v1.36.2+k3s1', allow_sdcard=True)['control_plane_prerequisites'], [])
+
     def test_standalone_cluster_is_never_treated_as_a_fresh_join(self):
         facts = self.facts()
         facts['existing_service'] = 'k3s'

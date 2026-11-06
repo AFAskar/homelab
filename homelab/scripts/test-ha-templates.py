@@ -25,7 +25,7 @@ class TemplateTests(unittest.TestCase):
                   'adguard_version': 'v0.107.78',
                   'adguard_config_directory': '/etc/adguardhome',
                   'adguard_work_directory': '/var/lib/adguardhome',
-                  'pi_wifi_recovery_address': '192.168.1.18'}
+                  'pi_wifi_recovery_address': '192.168.1.18', 'pi_wired_static': False}
         values.update(extra)
         return jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(
             (TEMPLATES / name).read_text()).render(**values)

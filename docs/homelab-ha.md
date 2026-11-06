@@ -62,6 +62,7 @@ ha_virtual_ip: YOUR_RESERVED_LAN_IPV4
 ha_topology_reviewed: true
 dns_wired_address_reserved: true
 ha_allow_sdcard: true # Only when intentionally using the existing SD card.
+pi_wired_static: true # Set only after reserving the Ethernet address.
 ```
 
 Leave deployment gates closed until those facts are established. The committed
@@ -103,12 +104,20 @@ Stage and apply wired networking while retaining Wi-Fi recovery:
 ```sh
 ansible-playbook -i homelab/ansible/inventory.yaml homelab/ansible/network.yaml \
   -e @homelab/private/ha.yaml
-# The next command reboots only the Pi; inspect the staged interfaces first.
+# Apply Ethernet preference while retaining Wi-Fi recovery.
 ansible-playbook -i homelab/ansible/inventory.yaml homelab/ansible/network.yaml \
   -e @homelab/private/ha.yaml -e pi_network_apply=true
+# Apply the reserved static address during a Pi-only reboot.
+ansible-playbook -i homelab/ansible/inventory.yaml homelab/ansible/network.yaml \
+  -e @homelab/private/ha.yaml -e pi_network_reboot=true
 ssh rpi4 'ip route get 192.168.1.28'
 ssh -i ~/.ssh/KaliVM rpi4@192.168.1.23 hostname
 ```
+
+Before reservation, the network play can retain Ethernet DHCP by keeping
+`pi_wired_static: false`. Wi-Fi's default and connected routes use metric 600
+so Ethernet is preferred. `readiness.py --allow-sdcard` evaluates the selected
+SD-card setup without treating the absence of an SSD as an unresolved choice.
 
 ## Deploy independent DNS
 

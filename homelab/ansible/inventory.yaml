@@ -18,6 +18,7 @@ all:
     ha_topology_reviewed: false
     # Prefer SSD. Set true explicitly when accepting the Pi's existing SD card.
     ha_allow_sdcard: false
+    pi_wired_static: false
     ha_backup_directory: '{{ playbook_dir }}/../private/backups'
     ha_virtual_ip: ''
     ha_virtual_prefix: 24

@@ -4,12 +4,13 @@
   vars:
     dns_wired_address_reserved: false
     pi_network_apply: false
+    pi_network_reboot: false
     pi_wifi_recovery_address: 192.168.1.18
   tasks:
     - name: Require address reservation and the discovered Alpine interfaces
       ansible.builtin.assert:
         that:
-          - dns_wired_address_reserved | bool
+          - not (pi_wired_static | bool) or dns_wired_address_reserved | bool
           - ansible_facts.distribution == 'Alpine'
           - node_interface == 'eth0'
           - "'eth0' in ansible_facts.interfaces"
@@ -25,10 +26,23 @@
     - name: Check the generated interfaces without changing links
       ansible.builtin.command: ifquery --list
       changed_when: false
-    - name: Apply the reviewed network configuration through a controlled reboot
+    - name: Read the current LAN route
+      ansible.builtin.command: ip -4 route get 192.168.1.28
+      register: pi_current_route
+      changed_when: false
+    - name: Keep a higher-metric Wi-Fi connected route for recovery
+      ansible.builtin.command:
+        argv: [ip, -4, route, replace, 192.168.1.0/24, dev, wlan0, src, '{{ pi_wifi_recovery_address }}', metric, '600']
+      when: pi_network_apply | bool and 'dev eth0' not in pi_current_route.stdout
+      changed_when: true
+    - name: Remove only the competing zero-metric Wi-Fi connected route
+      ansible.builtin.command: ip -4 route del 192.168.1.0/24 dev wlan0 metric 0
+      when: pi_network_apply | bool and 'dev eth0' not in pi_current_route.stdout
+      changed_when: true
+    - name: Apply a static address through an explicitly selected reboot
       ansible.builtin.reboot:
         reboot_timeout: 240
-      when: pi_network_apply | bool
+      when: pi_network_reboot | bool
     - name: Verify the wired path after reboot
       ansible.builtin.command: ip route get 192.168.1.28
       register: pi_wired_route
