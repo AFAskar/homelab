@@ -7,14 +7,13 @@
     adguard_repository_root: '{{ playbook_dir }}/../..'
     adguard_version: v0.107.78
     adguard_arm64_sha256: 71ef6d495d6d3fae45e6a80a172d44ae7f5aa528794cf927bb52fd5bff034eae
-    dns_wired_address_reserved: false
     adguard_config_directory: /etc/adguardhome
     adguard_work_directory: /var/lib/adguardhome
   tasks:
-    - name: Require a stable wired address before publishing DNS
+    - name: Require static wired configuration before publishing DNS
       ansible.builtin.assert:
-        that: dns_wired_address_reserved | bool
-        fail_msg: Reserve the Pi Ethernet address in DHCP or configure it statically, then set dns_wired_address_reserved=true.
+        that: pi_wired_static | bool
+        fail_msg: Apply the Pi static network configuration before publishing DNS.
     - name: Bootstrap Python on Alpine using authenticated doas
       ansible.builtin.raw: 'test -x /usr/bin/python3 || { apk add --no-cache python3 && echo PYTHON_INSTALLED; }'
       register: dns_python
@@ -55,9 +54,14 @@
             'dns': {'bind_hosts': [node_ip], 'port': 5353},
             'http': {'address': node_ip + ':3000'}}, recursive=true) }}
       no_log: true
+    - name: Create the native resolver group explicitly on Alpine
+      ansible.builtin.group:
+        name: adguard
+        system: true
     - name: Create the unprivileged native resolver account
       ansible.builtin.user:
         name: adguard
+        group: adguard
         system: true
         create_home: false
         shell: /sbin/nologin

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 import jinja2
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES = ROOT / 'homelab/ansible/templates'
@@ -44,6 +45,27 @@ class TemplateTests(unittest.TestCase):
         # alone can leave the failed node owning the VIP.
         self.assertNotIn('weight ', config)
         self.assertIn('nopreempt', config)
+
+    def test_dns_health_rejects_errors_and_accepts_duplicate_expected_answers(self):
+        play = yaml.safe_load((ROOT / 'homelab/ansible/api-endpoint.yaml').read_text())[0]
+        source = next(t['ansible.builtin.copy']['content'] for t in play['tasks']
+                      if t.get('ansible.builtin.copy', {}).get('dest') == '/usr/local/sbin/homelab-ha-health')
+        script = jinja2.Template(source).render(node_ip='192.168.1.23', hostvars={'pos': {'node_ip': '192.168.1.28'}})
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / 'k3s').write_text('#!/bin/sh\nexit 0\n')
+            (directory / 'dig').write_text('#!/bin/sh\nprintf "%s\\n" "$DNS_ANSWER"\nexit "$DNS_STATUS"\n')
+            for executable in directory.iterdir():
+                executable.chmod(0o755)
+            script = script.replace('/usr/local/bin/k3s', str(directory / 'k3s'))
+            for status, answer, success in [(9, ';; no servers could be reached', False),
+                                            (0, '', False), (0, '192.168.1.99', False),
+                                            (0, '192.168.1.28\n192.168.1.28', True)]:
+                with self.subTest(status=status, answer=answer):
+                    environment = dict(os.environ, PATH=str(directory) + os.pathsep + os.environ['PATH'],
+                                       DNS_STATUS=str(status), DNS_ANSWER=answer)
+                    result = subprocess.run(['sh'], input=script, text=True, env=environment, capture_output=True)
+                    self.assertEqual(result.returncode == 0, success)
 
     def test_firewall_preserves_other_chains_and_translates_vip_to_bound_listener(self):
         with tempfile.TemporaryDirectory() as temporary:

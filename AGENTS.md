@@ -1,17 +1,18 @@
 # Machines
 
-there are 2 nodes in the homelab each equipped with k3s
+There are three k3s server/agent nodes with embedded etcd: pos, optiplex and rpi4.
+POS and rpi4 also provide DNS and the shared LAN API/DNS address 192.168.1.250.
 
 ## pos:
 
-responsibilities: podman, control plane and agent node
+responsibilities: podman, control plane, agent node and DNS
 ips: 192.168.1.28 (lan), 100.114.113.82 (tailscale)
 distro: alma linux
 username: pos
 ssh config alias : pos
 ## optiplex
 
-responsibilities: agent node
+responsibilities: control plane and agent node
 ips: 192.168.1.27 (lan), 100.77.7.115 (tailscale)
 distro: alpine linux (doas not sudo)
 username: run-barry-run
@@ -19,12 +20,12 @@ ssh config alias : optiplex
 
 ## rpi4
 
-Alpine ARM64 Raspberry Pi 4, approximately 4 GB RAM. SSH alias/user: `rpi4`;
+Alpine ARM64 Raspberry Pi 4, approximately 4 GB RAM; control plane and native DNS.
+SSH alias/user: `rpi4`;
 use doas. Wi-Fi recovery: 192.168.1.18; wired interface eth0 currently uses
-192.168.1.23. Reserve the wired address before deployment. Host automation and
-the proposed POS/Optiplex/rpi4 three-server topology are in `homelab/ansible/`.
-The Pi's existing standalone cluster must be preserved/retired explicitly
-before joining the production cluster; see `docs/homelab-ha.md`.
+192.168.1.23 statically. Keep static addresses outside router DHCP allocation.
+Host automation is in `homelab/ansible/`; see `docs/homelab-ha.md`.
+Retire foreign standalone state explicitly before joining a replacement node.
 
 # Rootless Podman services
 

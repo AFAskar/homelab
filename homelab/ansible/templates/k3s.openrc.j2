@@ -8,6 +8,12 @@ output_log="/var/log/k3s.log"
 error_log="/var/log/k3s.log"
 respawn_delay=5
 respawn_max=0
+{% if inventory_hostname == 'rpi4' %}
+# Node exporter uses HostToContainer propagation for its read-only root mount.
+start_pre() {
+    /bin/mount --make-rshared /
+}
+{% endif %}
 depend() {
     need net
     want cgroups

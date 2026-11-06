@@ -2,15 +2,14 @@
   hosts: rpi4
   become: true
   vars:
-    dns_wired_address_reserved: false
     pi_network_apply: false
     pi_network_reboot: false
     pi_wifi_recovery_address: 192.168.1.18
   tasks:
-    - name: Require address reservation and the discovered Alpine interfaces
+    - name: Require the selected address and discovered Alpine interfaces
       ansible.builtin.assert:
         that:
-          - not (pi_wired_static | bool) or dns_wired_address_reserved | bool
+          - node_ip in ansible_facts.all_ipv4_addresses
           - ansible_facts.distribution == 'Alpine'
           - node_interface == 'eth0'
           - "'eth0' in ansible_facts.interfaces"

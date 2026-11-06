@@ -2,14 +2,12 @@
   hosts: api_frontends
   become: true
   serial: 1
-  vars:
-    dns_wired_address_reserved: false
   tasks:
     - name: Require the reviewed topology and reserved LAN addresses
       ansible.builtin.assert:
         that:
           - ha_topology_reviewed | bool
-          - dns_wired_address_reserved | bool
+          - pi_wired_static | bool
           - ha_virtual_ip | length > 0
           - ansible_facts.default_ipv4.interface == node_interface
     - name: Validate the operator-selected VIP against node addresses
@@ -33,7 +31,7 @@
       changed_when: false
     - name: Install native failover and health-check tools on POS
       ansible.builtin.dnf:
-        name: [keepalived, bind-utils]
+        name: [keepalived, bind-utils, policycoreutils-python-utils]
         state: present
       when: ansible_facts.os_family == 'RedHat'
     - name: Install native failover and health-check tools on Alpine
@@ -79,7 +77,26 @@
           #!/bin/sh
           set -eu
           /usr/local/bin/k3s kubectl --request-timeout=2s get --raw=/readyz >/dev/null
-          test -n "$(dig +time=1 +tries=1 +short @{{ node_ip }} -p 5353 pelican.home.internal)"
+          answer=$(dig +time=1 +tries=1 +short @{{ node_ip }} -p 5353 pos.home.internal A)
+          printf '%s\n' "$answer" | grep -Fxq '{{ hostvars.pos.node_ip }}'
+    - name: Persist the SELinux type for the root-owned keepalived health script
+      community.general.sefcontext:
+        target: /usr/local/sbin/homelab-ha-health
+        setype: keepalived_unconfined_script_exec_t
+        state: present
+      when: ansible_facts.os_family == 'RedHat' and ansible_facts.selinux.status == 'enabled'
+    - name: Label only the keepalived health script for its SELinux transition
+      ansible.builtin.file:
+        path: /usr/local/sbin/homelab-ha-health
+        setype: keepalived_unconfined_script_exec_t
+      when: ansible_facts.os_family == 'RedHat' and ansible_facts.selinux.status == 'enabled'
+    - name: Create the keepalived configuration directory
+      ansible.builtin.file:
+        path: /etc/keepalived
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
     - name: Install the unicast failover configuration
       ansible.builtin.template:
         src: keepalived.conf.j2

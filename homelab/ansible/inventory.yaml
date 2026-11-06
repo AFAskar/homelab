@@ -14,13 +14,13 @@ all:
       disable-cloud-controller: false
       disable-kube-proxy: false
       secrets-encryption: false
-    # Deployment gates are deliberately closed until the runbook is completed.
-    ha_topology_reviewed: false
+    # Reviewed three-server deployment using the existing Pi SD card.
+    ha_topology_reviewed: true
     # Prefer SSD. Set true explicitly when accepting the Pi's existing SD card.
-    ha_allow_sdcard: false
-    pi_wired_static: false
+    ha_allow_sdcard: true
+    pi_wired_static: true
     ha_backup_directory: '{{ playbook_dir }}/../private/backups'
-    ha_virtual_ip: ''
+    ha_virtual_ip: 192.168.1.250
     ha_virtual_prefix: 24
     ha_virtual_router_id: 61
   children:
