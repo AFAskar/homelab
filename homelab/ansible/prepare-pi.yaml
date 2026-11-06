@@ -1,0 +1,31 @@
+- name: Install Ansible prerequisites without changing the existing cluster
+  hosts: rpi4
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Bootstrap Python and inspection tools on Alpine
+      ansible.builtin.raw: >-
+        apk info -e python3 iproute2 util-linux openssh-sftp-server >/dev/null 2>&1 ||
+        { apk add --no-cache python3 iproute2 util-linux openssh-sftp-server && echo PREREQUISITES_INSTALLED; }
+      register: pi_bootstrap
+      changed_when: "'PREREQUISITES_INSTALLED' in pi_bootstrap.stdout"
+    - name: Create the empty data directory for the reviewed cluster join
+      ansible.builtin.file:
+        path: '{{ k3s_data_dir }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Mount and persist cgroup v2 before starting a k3s server
+      ansible.builtin.service:
+        name: cgroups
+        state: started
+        enabled: true
+        runlevel: boot
+    - name: Create the native administration script directory on Alpine
+      ansible.builtin.file:
+        path: /usr/local/sbin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'

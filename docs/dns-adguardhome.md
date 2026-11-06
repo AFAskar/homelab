@@ -4,6 +4,10 @@ AdGuard runs on pos as the rootless systemd user service `adguardhome.service`.
 Ansible installs its Quadlet, encrypted configuration, persistent directories
 and DNS firewall rules.
 
+For a second native resolver on the Alpine Pi and staged LAN failover, follow
+[homelab HA setup](homelab-ha.md). The existing POS deployment remains the
+authoritative rootless Quadlet entrypoint.
+
 ## Deploy
 
 Prerequisites: SSH/sudo access to pos, Ansible, SOPS, dig and the repository's
@@ -68,6 +72,8 @@ container listener from host forwarding. Preserve logs privately.
 ```bash
 sops docker/adguardhome/AdGuardHome.secret.sops.yaml
 ansible-playbook -i pos, docker/adguardhome/deploy.yaml
+# Reconcile the Pi too when the HA resolver is deployed:
+ansible-playbook -i homelab/ansible/inventory.yaml homelab/ansible/dns-secondary.yaml
 ```
 
 Edit the YAML string under `data.AdGuardHome.yaml`, then commit the encrypted
@@ -75,8 +81,10 @@ change. Web-UI settings edits are drift and will be replaced on reconciliation.
 Keep plaintext exports and runtime data outside Git.
 
 After OCI address changes, run `python3 oci/scripts/render-inventory.py`, review
-the desired EndpointSlice and redeploy DNS. CoreDNS forwards `home.internal`
-to pos:5353. Each Wings name must resolve to exactly its private VNIC address.
+the desired EndpointSlice and redeploy both DNS resolvers with the commands
+above. The HA CoreDNS overlay forwards `home.internal` to both POS and Pi on
+port 5353; leaving either resolver stale can return old Wings addresses.
+Each Wings name must resolve to exactly its private VNIC address.
 For image upgrades, update `adguard_image` in the deployment playbook,
 check configuration compatibility, and deploy after preserving required data.
 

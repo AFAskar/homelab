@@ -38,3 +38,6 @@ oci/**/*.fd
 oci/**/nvram.bin
 oci/**/firmware.bin
 oci/**/tpm/
+
+# Homelab migration backups, kubeconfigs and private inspection output
+homelab/private/

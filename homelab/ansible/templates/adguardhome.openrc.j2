@@ -1,0 +1,14 @@
+#!/sbin/openrc-run
+description="Independent homelab AdGuard Home resolver"
+supervisor=supervise-daemon
+command="/opt/adguardhome/{{ adguard_version }}/AdGuardHome/AdGuardHome"
+command_args="--no-check-update -c {{ adguard_config_directory }}/AdGuardHome.yaml -w {{ adguard_work_directory }}"
+command_user="adguard:adguard"
+directory="{{ adguard_work_directory }}"
+pidfile="/run/adguardhome.pid"
+respawn_delay=5
+respawn_max=0
+depend() {
+    need net homelab-dns-firewall
+    after firewall
+}

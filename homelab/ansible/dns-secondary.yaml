@@ -1,0 +1,211 @@
+# The existing POS Quadlet remains managed by docker/adguardhome/deploy.yaml.
+- name: Provision the independent Alpine DNS replica
+  hosts: dns_secondary
+  become: true
+  gather_facts: false
+  vars:
+    adguard_repository_root: '{{ playbook_dir }}/../..'
+    adguard_version: v0.107.78
+    adguard_arm64_sha256: 71ef6d495d6d3fae45e6a80a172d44ae7f5aa528794cf927bb52fd5bff034eae
+    adguard_config_directory: /etc/adguardhome
+    adguard_work_directory: /var/lib/adguardhome
+  tasks:
+    - name: Require static wired configuration before publishing DNS
+      ansible.builtin.assert:
+        that: pi_wired_static | bool
+        fail_msg: Apply the Pi static network configuration before publishing DNS.
+    - name: Bootstrap Python on Alpine using authenticated doas
+      ansible.builtin.raw: 'test -x /usr/bin/python3 || { apk add --no-cache python3 && echo PYTHON_INSTALLED; }'
+      register: dns_python
+      changed_when: "'PYTHON_INSTALLED' in dns_python.stdout"
+    - name: Gather node facts after bootstrap
+      ansible.builtin.setup:
+    - name: Require the inspected Alpine ARM64 host and wired IP
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Alpine'
+          - ansible_facts.architecture == 'aarch64'
+          - node_ip in ansible_facts.all_ipv4_addresses
+          - ansible_facts.default_ipv4.interface == node_interface
+          - ansible_facts.service_mgr == 'openrc'
+    - name: Install native archive and firewall prerequisites
+      community.general.apk:
+        name: [ca-certificates, tar, iptables]
+        state: present
+    - name: Create the native administration script directory
+      ansible.builtin.file:
+        path: /usr/local/sbin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Load the same encrypted settings and OCI records as POS
+      ansible.builtin.include_tasks: ../../docker/adguardhome/settings.yaml
+    - name: Refuse unexpected DHCP or TLS listeners on a DNS replica
+      ansible.builtin.assert:
+        that:
+          - not (adguard_source.dhcp.enabled | default(false))
+          - not (adguard_source.tls.enabled | default(false))
+      no_log: true
+    - name: Scope the native DNS and UI listeners to the wired address
+      ansible.builtin.set_fact:
+        adguard_secondary_config: >-
+          {{ adguard_desired | combine({
+            'dns': {'bind_hosts': [node_ip], 'port': 5353},
+            'http': {'address': node_ip + ':3000'}}, recursive=true) }}
+      no_log: true
+    - name: Create the native resolver group explicitly on Alpine
+      ansible.builtin.group:
+        name: adguard
+        system: true
+    - name: Create the unprivileged native resolver account
+      ansible.builtin.user:
+        name: adguard
+        group: adguard
+        system: true
+        create_home: false
+        shell: /sbin/nologin
+        home: '{{ adguard_work_directory }}'
+    - name: Create private persistent service directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: adguard
+        group: adguard
+        mode: '0700'
+      loop: ['{{ adguard_config_directory }}', '{{ adguard_work_directory }}']
+    - name: Create the versioned binary directory
+      ansible.builtin.file:
+        path: '/opt/adguardhome/{{ adguard_version }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Fetch the official ARM64 release with its published digest
+      ansible.builtin.get_url:
+        url: 'https://github.com/AdguardTeam/AdGuardHome/releases/download/{{ adguard_version }}/AdGuardHome_linux_arm64.tar.gz'
+        dest: '/opt/adguardhome/{{ adguard_version }}/release.tar.gz'
+        checksum: 'sha256:{{ adguard_arm64_sha256 }}'
+        mode: '0644'
+    - name: Extract the verified native release
+      ansible.builtin.unarchive:
+        src: '/opt/adguardhome/{{ adguard_version }}/release.tar.gz'
+        dest: '/opt/adguardhome/{{ adguard_version }}'
+        remote_src: true
+        creates: '/opt/adguardhome/{{ adguard_version }}/AdGuardHome/AdGuardHome'
+    - name: Stage and validate the candidate settings before stopping DNS
+      block:
+        - name: Create a private candidate file
+          ansible.builtin.tempfile:
+            state: file
+            suffix: .yaml
+          register: dns_candidate
+          changed_when: false
+          no_log: true
+        - name: Render candidate settings
+          ansible.builtin.copy:
+            content: '{{ adguard_secondary_config | to_nice_yaml(indent=2, sort_keys=false) }}'
+            dest: '{{ dns_candidate.path }}'
+            mode: '0600'
+          changed_when: false
+          no_log: true
+        - name: Validate the full native configuration
+          ansible.builtin.command:
+            argv:
+              - '/opt/adguardhome/{{ adguard_version }}/AdGuardHome/AdGuardHome'
+              - --check-config
+              - -c
+              - '{{ dns_candidate.path }}'
+              - -w
+              - '{{ adguard_work_directory }}'
+          changed_when: false
+          no_log: true
+      always:
+        - name: Remove only the private candidate file
+          ansible.builtin.file:
+            path: '{{ dns_candidate.path }}'
+            state: absent
+          when: dns_candidate.path is defined
+          changed_when: false
+          no_log: true
+    - name: Inspect existing replica configuration
+      ansible.builtin.stat:
+        path: '{{ adguard_config_directory }}/AdGuardHome.yaml'
+      register: dns_config_stat
+    - name: Read existing replica configuration privately
+      ansible.builtin.slurp:
+        src: '{{ adguard_config_directory }}/AdGuardHome.yaml'
+      when: dns_config_stat.stat.exists
+      register: dns_previous
+      no_log: true
+    - name: Compare semantic settings without restarting for formatting changes
+      ansible.builtin.set_fact:
+        dns_settings_changed: >-
+          {{ not dns_config_stat.stat.exists or
+            (dns_previous.content | default('') | b64decode | from_yaml) != adguard_secondary_config }}
+      no_log: true
+    - name: Read installed service names
+      ansible.builtin.service_facts:
+    - name: Stop the native replica before replacing its live settings
+      ansible.builtin.service:
+        name: adguardhome
+        state: stopped
+      when: dns_settings_changed and 'adguardhome' in ansible_facts.services
+    - name: Install validated private settings with a rollback backup
+      ansible.builtin.copy:
+        content: '{{ adguard_secondary_config | to_nice_yaml(indent=2, sort_keys=false) }}'
+        dest: '{{ adguard_config_directory }}/AdGuardHome.yaml'
+        owner: adguard
+        group: adguard
+        mode: '0600'
+        backup: true
+      when: dns_settings_changed
+      no_log: true
+    - name: Install the native OpenRC service
+      ansible.builtin.template:
+        src: adguardhome.openrc.j2
+        dest: /etc/init.d/adguardhome
+        owner: root
+        group: root
+        mode: '0755'
+      register: dns_service
+    - name: Install only the replica-owned firewall chains
+      ansible.builtin.template:
+        src: dns-firewall.sh.j2
+        dest: /usr/local/sbin/homelab-dns-firewall
+        mode: '0750'
+        validate: /bin/sh -n %s
+    - name: Persist DNS filtering before k3s and the resolver
+      ansible.builtin.copy:
+        dest: /etc/init.d/homelab-dns-firewall
+        mode: '0755'
+        content: |
+          #!/sbin/openrc-run
+          description="Scoped homelab DNS listeners"
+          depend() { need localmount; before adguardhome k3s k3s-agent; }
+          start() { /usr/local/sbin/homelab-dns-firewall; }
+    - name: Enable scoped DNS firewall at boot
+      ansible.builtin.service:
+        name: homelab-dns-firewall
+        state: started
+        enabled: true
+        runlevel: boot
+    - name: Reconcile scoped DNS firewall rules
+      ansible.builtin.command: /usr/local/sbin/homelab-dns-firewall
+      changed_when: false
+    - name: Enable and converge the independent resolver
+      ansible.builtin.service:
+        name: adguardhome
+        enabled: true
+        state: "{{ 'restarted' if dns_service.changed else 'started' }}"
+    - name: Verify both resolver transports and internal/public zones
+      ansible.builtin.command:
+        argv: [dig, '+short', '{{ item.0 }}', '@{{ node_ip }}', -p, '53', '{{ item.1 }}']
+      delegate_to: localhost
+      become: false
+      loop: "{{ ['+tcp', '+notcp'] | product(['github.com', 'pelican.home.internal', 'wings-01.oci.home.internal']) | list }}"
+      register: dns_answer
+      changed_when: false
+      until: dns_answer.rc == 0 and dns_answer.stdout_lines | length > 0
+      retries: 5
+      delay: 2

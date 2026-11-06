@@ -1,0 +1,80 @@
+- name: Give the Pi stable wired networking while retaining Wi-Fi recovery
+  hosts: rpi4
+  become: true
+  vars:
+    pi_network_apply: false
+    pi_network_reboot: false
+    pi_wifi_recovery_address: 192.168.1.18
+  tasks:
+    - name: Require the selected address and discovered Alpine interfaces
+      ansible.builtin.assert:
+        that:
+          - node_ip in ansible_facts.all_ipv4_addresses
+          - ansible_facts.distribution == 'Alpine'
+          - node_interface == 'eth0'
+          - "'eth0' in ansible_facts.interfaces"
+          - "'wlan0' in ansible_facts.interfaces"
+    - name: Render wired and recovery networking with a rollback backup
+      ansible.builtin.template:
+        src: pi-interfaces.j2
+        dest: /etc/network/interfaces
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+    - name: Check the generated interfaces without changing links
+      ansible.builtin.command: ifquery --list
+      changed_when: false
+    - name: Allow valid asymmetric replies while retaining both LAN interfaces
+      ansible.posix.sysctl:
+        name: 'net.ipv4.conf.{{ item }}.rp_filter'
+        value: '2'
+        sysctl_file: /etc/sysctl.d/60-homelab-multihome.conf
+        sysctl_set: true
+        reload: true
+      loop: [all, default, eth0, wlan0]
+      when: pi_network_apply | bool
+    - name: Read the current LAN route
+      ansible.builtin.command: ip -4 route get 192.168.1.28
+      register: pi_current_route
+      changed_when: false
+    - name: Keep a higher-metric Wi-Fi connected route for recovery
+      ansible.builtin.command:
+        argv: [ip, -4, route, replace, 192.168.1.0/24, dev, wlan0, src, '{{ pi_wifi_recovery_address }}', metric, '600']
+      when: pi_network_apply | bool and 'dev eth0' not in pi_current_route.stdout
+      changed_when: true
+    - name: Inspect Wi-Fi connected routes before deleting a zero-metric route
+      ansible.builtin.command: ip -4 route show exact 192.168.1.0/24 dev wlan0
+      register: pi_wifi_connected
+      changed_when: false
+    - name: Remove only the competing zero-metric Wi-Fi connected route
+      ansible.builtin.command: ip -4 route del 192.168.1.0/24 dev wlan0 metric 0
+      when:
+        - pi_network_apply | bool
+        - "'dev eth0' not in pi_current_route.stdout"
+        - pi_wifi_connected.stdout_lines | reject('search', ' metric [1-9]') | list | length > 0
+      changed_when: true
+    - name: Apply a static address through an explicitly selected reboot
+      ansible.builtin.reboot:
+        reboot_timeout: 240
+      when: pi_network_reboot | bool
+    - name: Verify LAN routing prefers Ethernet
+      ansible.builtin.command: ip route get 192.168.1.28
+      register: pi_wired_route
+      changed_when: false
+      failed_when: "'dev eth0' not in pi_wired_route.stdout"
+      when: pi_network_apply | bool
+    - name: Verify the wired gateway before removing temporary Wi-Fi preference
+      ansible.builtin.command: ping -I eth0 -c 1 -W 2 192.168.1.1
+      changed_when: false
+      when: pi_network_apply | bool
+    - name: Read Wi-Fi default routes
+      ansible.builtin.command: ip -4 route show default dev wlan0
+      register: pi_wifi_defaults
+      changed_when: false
+    - name: Remove the temporary recovery preference after wired access works
+      ansible.builtin.command: ip -4 route del default dev wlan0 metric 1
+      changed_when: true
+      when:
+        - pi_network_apply | bool
+        - pi_wifi_defaults.stdout_lines | select('search', 'metric 1($| )') | list | length > 0
