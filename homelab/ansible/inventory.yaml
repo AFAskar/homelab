@@ -1,0 +1,56 @@
+all:
+  vars:
+    k3s_version: v1.36.2+k3s1
+    k3s_bootstrap_host: pos
+    k3s_data_dir: /var/lib/rancher/k3s
+    k3s_api_port: 6443
+    k3s_common_config:
+      cluster-cidr: 10.42.0.0/16
+      service-cidr: 10.43.0.0/16
+      cluster-dns: 10.43.0.10
+      cluster-domain: cluster.local
+      flannel-backend: vxlan
+      disable-network-policy: false
+      disable-cloud-controller: false
+      disable-kube-proxy: false
+      secrets-encryption: false
+    # Deployment gates are deliberately closed until the runbook is completed.
+    ha_topology_reviewed: false
+    # Prefer SSD. Set true explicitly when accepting the Pi's existing SD card.
+    ha_allow_sdcard: false
+    ha_backup_directory: '{{ playbook_dir }}/../private/backups'
+    ha_virtual_ip: ''
+    ha_virtual_prefix: 24
+    ha_virtual_router_id: 61
+  children:
+    control_plane:
+      hosts:
+        pos:
+          ansible_host: pos
+          ansible_user: pos
+          ansible_become_method: sudo
+          node_ip: 192.168.1.28
+          node_interface: enp1s0
+        optiplex:
+          ansible_host: optiplex
+          ansible_user: run-barry-run
+          ansible_become_method: doas
+          node_ip: 192.168.1.27
+          node_interface: eth0
+        rpi4:
+          ansible_host: rpi4
+          ansible_user: rpi4
+          ansible_become_method: doas
+          # Reuse the existing alias/key and verified host identity over Ethernet.
+          ansible_ssh_common_args: -o Hostname=192.168.1.23 -o HostKeyAlias=192.168.1.18
+          node_ip: 192.168.1.23
+          node_interface: eth0
+    dns_secondary:
+      hosts:
+        rpi4: {}
+    api_frontends:
+      hosts:
+        pos:
+          ha_priority: 150
+        rpi4:
+          ha_priority: 100

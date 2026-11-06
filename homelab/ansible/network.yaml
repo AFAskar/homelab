@@ -1,0 +1,37 @@
+- name: Give the Pi stable wired networking while retaining Wi-Fi recovery
+  hosts: rpi4
+  become: true
+  vars:
+    dns_wired_address_reserved: false
+    pi_network_apply: false
+    pi_wifi_recovery_address: 192.168.1.18
+  tasks:
+    - name: Require address reservation and the discovered Alpine interfaces
+      ansible.builtin.assert:
+        that:
+          - dns_wired_address_reserved | bool
+          - ansible_facts.distribution == 'Alpine'
+          - node_interface == 'eth0'
+          - "'eth0' in ansible_facts.interfaces"
+          - "'wlan0' in ansible_facts.interfaces"
+    - name: Render wired and recovery networking with a rollback backup
+      ansible.builtin.template:
+        src: pi-interfaces.j2
+        dest: /etc/network/interfaces
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+    - name: Check the generated interfaces without changing links
+      ansible.builtin.command: ifquery --list
+      changed_when: false
+    - name: Apply the reviewed network configuration through a controlled reboot
+      ansible.builtin.reboot:
+        reboot_timeout: 240
+      when: pi_network_apply | bool
+    - name: Verify the wired path after reboot
+      ansible.builtin.command: ip route get 192.168.1.28
+      register: pi_wired_route
+      changed_when: false
+      failed_when: "'dev eth0' not in pi_wired_route.stdout"
+      when: pi_network_apply | bool

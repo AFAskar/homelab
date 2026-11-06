@@ -1,0 +1,291 @@
+# No uninstall, cluster reset, filesystem creation or automatic standalone wipe.
+- name: Check the complete quorum before changing the existing server
+  hosts: control_plane
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require the reviewed three-server topology and API address
+      ansible.builtin.assert:
+        that:
+          - ha_topology_reviewed | bool
+          - groups.control_plane | length == 3
+          - ha_virtual_ip | length > 0
+          - inventory_hostname == 'pos' or ansible_facts.distribution == 'Alpine'
+          - node_ip in ansible_facts.all_ipv4_addresses
+          - ansible_facts.default_ipv4.interface == node_interface
+          - ansible_facts.memtotal_mb >= 1800
+        fail_msg: Complete the HA runbook, storage/network preparation and topology review before running this play.
+    - name: Require the already installed pinned k3s binary
+      ansible.builtin.command: /usr/local/bin/k3s --version
+      register: installed_k3s
+      changed_when: false
+      failed_when: k3s_version not in installed_k3s.stdout.split()
+    - name: Check memory accounting on cgroup v2 hosts
+      ansible.builtin.slurp:
+        src: /sys/fs/cgroup/cgroup.controllers
+      register: ha_cgroups
+    - name: Require the live memory controller
+      ansible.builtin.assert:
+        that: "'memory' in (ha_cgroups.content | b64decode).split()"
+    - name: Inspect the existing data filesystem
+      ansible.builtin.command: 'findmnt -n -o SOURCE,FSTYPE -T {{ k3s_data_dir }}'
+      register: ha_storage
+      changed_when: false
+    - name: Refuse embedded etcd on the Pi SD card
+      ansible.builtin.assert:
+        that: "ha_allow_sdcard | bool or not ha_storage.stdout.split()[0].startswith('/dev/mmcblk')"
+        fail_msg: Prefer SSD storage, or explicitly set ha_allow_sdcard=true for the existing SD card and follow the backup procedure.
+      when: inventory_hostname == 'rpi4'
+    - name: Inspect any server CA before writing join configuration
+      ansible.builtin.stat:
+        path: '{{ k3s_data_dir }}/server/tls/server-ca.crt'
+        checksum_algorithm: sha256
+      register: ha_server_ca
+    - name: Refuse a foreign standalone server datastore
+      ansible.builtin.assert:
+        that: >-
+          not ha_server_ca.stat.exists or
+          ha_server_ca.stat.checksum == hostvars[k3s_bootstrap_host].ha_server_ca.stat.checksum
+        fail_msg: This server belongs to another cluster. Inventory, back up and explicitly retire it using the runbook; no files were overwritten.
+      when: inventory_hostname != k3s_bootstrap_host
+    - name: Inspect the current agent CA
+      ansible.builtin.stat:
+        path: '{{ k3s_data_dir }}/agent/server-ca.crt'
+        checksum_algorithm: sha256
+      register: ha_agent_ca
+    - name: Refuse a foreign agent installation
+      ansible.builtin.assert:
+        that: >-
+          not ha_agent_ca.stat.exists or
+          ha_agent_ca.stat.checksum == hostvars[k3s_bootstrap_host].ha_server_ca.stat.checksum
+      when: inventory_hostname != k3s_bootstrap_host
+    - name: Inspect datastore presence independently of its CA
+      ansible.builtin.stat:
+        path: '{{ k3s_data_dir }}/server/db'
+      register: ha_datastore
+    - name: Refuse unidentified existing server state
+      ansible.builtin.assert:
+        that: not ha_datastore.stat.exists or ha_server_ca.stat.exists
+    - name: Inspect existing managed configuration
+      ansible.builtin.stat:
+        path: /etc/rancher/k3s/config.yaml
+      register: ha_config_stat
+    - name: Read existing configuration privately
+      ansible.builtin.slurp:
+        src: /etc/rancher/k3s/config.yaml
+      when: ha_config_stat.stat.exists
+      register: ha_old_config
+      no_log: true
+    - name: Preserve existing configuration fields
+      ansible.builtin.set_fact:
+        ha_preserved_config: '{{ ha_old_config.content | default("e30=") | b64decode | from_yaml | default({}, true) }}'
+      no_log: true
+    - name: Refuse incompatible existing datastore settings
+      ansible.builtin.assert:
+        that:
+          - "'datastore-endpoint' not in ha_preserved_config"
+          - not (ha_preserved_config['cluster-reset'] | default(false))
+          - ha_preserved_config['data-dir'] | default(k3s_data_dir) == k3s_data_dir
+      no_log: true
+    - name: Require preserved critical settings to agree with the shared server configuration
+      ansible.builtin.assert:
+        that: item.key not in ha_preserved_config or ha_preserved_config[item.key] == item.value
+      loop: '{{ k3s_common_config | dict2items }}'
+      no_log: true
+
+- name: Prepare POS peer access after every host passes preflight
+  hosts: pos
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Permit only cluster peers to use etcd and node networking
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: >-
+          rule family="ipv4" source address="{{ hostvars[item.0].node_ip }}/32"
+          port port="{{ item.1.port }}" protocol="{{ item.1.protocol }}" accept
+        permanent: true
+        immediate: true
+        state: enabled
+      loop: >-
+        {{ groups.control_plane | product([
+          {'port': 6443, 'protocol': 'tcp'},
+          {'port': 2379, 'protocol': 'tcp'},
+          {'port': 2380, 'protocol': 'tcp'},
+          {'port': 10250, 'protocol': 'tcp'},
+          {'port': 8472, 'protocol': 'udp'}]) | list }}
+
+- name: Convert the existing POS SQLite datastore without replacing the cluster
+  hosts: pos
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require the original bootstrap server CA
+      ansible.builtin.assert:
+        that: ha_server_ca.stat.exists
+    - name: Inspect whether etcd migration is already complete
+      ansible.builtin.stat:
+        path: '{{ k3s_data_dir }}/server/db/etcd/member'
+      register: ha_etcd
+    - name: Preserve an offline recovery archive before conversion
+      when: not ha_etcd.stat.exists
+      block:
+        - name: Create private remote backup storage
+          ansible.builtin.file:
+            path: /var/backups/k3s
+            state: directory
+            mode: '0700'
+        - name: Select a unique recovery archive
+          ansible.builtin.set_fact:
+            ha_archive: '/var/backups/k3s/pre-etcd-{{ ansible_facts.date_time.epoch }}.tar.gz'
+        - name: Stop POS briefly for a consistent SQLite and token backup
+          ansible.builtin.systemd_service:
+            name: k3s
+            state: stopped
+        - name: Archive the existing server state and configuration
+          community.general.archive:
+            path:
+              - '{{ k3s_data_dir }}/server'
+              - /etc/rancher/k3s
+              - /etc/systemd/system/k3s.service
+              - /etc/systemd/system/k3s.service.env
+            dest: '{{ ha_archive }}'
+            mode: '0600'
+            format: gz
+        - name: Create private off-node backup storage on the operator
+          ansible.builtin.file:
+            path: '{{ ha_backup_directory }}'
+            state: directory
+            mode: '0700'
+          delegate_to: localhost
+          become: false
+        - name: Fetch and verify the offline recovery archive before conversion
+          ansible.builtin.fetch:
+            src: '{{ ha_archive }}'
+            dest: '{{ ha_backup_directory }}/'
+            flat: true
+            validate_checksum: true
+        - name: Protect the fetched recovery archive on the operator
+          ansible.builtin.file:
+            path: '{{ ha_backup_directory }}/{{ ha_archive | basename }}'
+            mode: '0600'
+          delegate_to: localhost
+          become: false
+      always:
+        - name: Restore the original server even if backup capture fails
+          ansible.builtin.systemd_service:
+            name: k3s
+            state: started
+    - name: Enable embedded etcd and preserve existing server settings
+      ansible.builtin.copy:
+        content: >-
+          {{ ha_preserved_config | combine(k3s_common_config) | combine({'cluster-init': true,
+            'tls-san': ((ha_preserved_config['tls-san'] | default([])) + [ha_virtual_ip]) | unique | list}) | to_nice_yaml }}
+        dest: /etc/rancher/k3s/config.yaml
+        mode: '0600'
+        backup: true
+      register: ha_pos_config
+      no_log: true
+      notify: Restart POS k3s
+    - name: Apply the datastore configuration before readiness checks
+      ansible.builtin.meta: flush_handlers
+    - name: Wait for embedded etcd initialization
+      ansible.builtin.wait_for:
+        path: '{{ k3s_data_dir }}/server/db/etcd/member'
+        timeout: 180
+    - name: Wait for the original authenticated API to be ready
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get --raw=/readyz
+      register: ha_pos_ready
+      changed_when: false
+      until: ha_pos_ready.rc == 0
+      retries: 30
+      delay: 5
+    - name: Read the existing join token without logging it
+      ansible.builtin.slurp:
+        src: '{{ k3s_data_dir }}/server/token'
+      register: ha_token
+      no_log: true
+  handlers:
+    - name: Restart POS k3s
+      ansible.builtin.systemd_service:
+        name: k3s
+        state: restarted
+
+- name: Join additional servers one at a time without uninstalling their agents
+  hosts: control_plane:!pos
+  order: inventory
+  serial: 1
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Create the private server configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        mode: '0700'
+    - name: Install the existing cluster join token privately
+      ansible.builtin.copy:
+        content: '{{ hostvars[k3s_bootstrap_host].ha_token.content | b64decode }}'
+        dest: /etc/rancher/k3s/ha-token
+        mode: '0600'
+      no_log: true
+    - name: Write server join settings while preserving existing fields
+      ansible.builtin.copy:
+        content: >-
+          {{ ha_preserved_config | combine(k3s_common_config) | combine({
+            'server': 'https://' + hostvars[k3s_bootstrap_host].node_ip + ':6443',
+            'cluster-init': false,
+            'token-file': '/etc/rancher/k3s/ha-token',
+            'node-name': inventory_hostname, 'node-ip': node_ip,
+            'flannel-iface': node_interface,
+            'tls-san': ((ha_preserved_config['tls-san'] | default([])) + [ha_virtual_ip]) | unique | list
+          }) | combine({'node-taint': ['homelab.local/infra=true:NoSchedule']} if inventory_hostname == 'rpi4' else {}) | to_nice_yaml }}
+        dest: /etc/rancher/k3s/config.yaml
+        mode: '0600'
+        backup: true
+      register: ha_join_config
+      no_log: true
+    - name: Check installed OpenRC agent service
+      ansible.builtin.stat:
+        path: /etc/init.d/k3s-agent
+      register: ha_old_agent
+    - name: Disable the superseded agent service without uninstalling or deleting data
+      ansible.builtin.service:
+        name: k3s-agent
+        state: stopped
+        enabled: false
+      when: ha_old_agent.stat.exists
+    - name: Install the Alpine server service
+      ansible.builtin.template:
+        src: k3s.openrc.j2
+        dest: /etc/init.d/k3s
+        mode: '0755'
+      register: ha_server_unit
+    - name: Enable and converge the server service
+      ansible.builtin.service:
+        name: k3s
+        enabled: true
+        state: '{{ "restarted" if ha_join_config.changed or ha_server_unit.changed else "started" }}'
+    - name: Wait for this server to pass authenticated API readiness
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get --raw=/readyz
+      register: ha_join_ready
+      changed_when: false
+      until: ha_join_ready.rc == 0
+      retries: 60
+      delay: 5
+    - name: Verify this node is Ready before joining another voter
+      ansible.builtin.command: '/usr/local/bin/k3s kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=180s'
+      changed_when: false
+
+- name: Verify the complete three-voter control plane
+  hosts: pos
+  become: true
+  tasks:
+    - name: Read control-plane node membership
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get nodes -l node-role.kubernetes.io/etcd --output=json
+      register: ha_members
+      changed_when: false
+    - name: Require all three expected etcd nodes before declaring HA
+      ansible.builtin.assert:
+        that: >-
+          (ha_members.stdout | from_json)['items'] | map(attribute='metadata.name') | sort == groups.control_plane | sort

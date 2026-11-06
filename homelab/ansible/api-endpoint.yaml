@@ -1,0 +1,97 @@
+- name: Provide the shared LAN API and DNS address on POS and the Pi
+  hosts: api_frontends
+  become: true
+  serial: 1
+  vars:
+    dns_wired_address_reserved: false
+  tasks:
+    - name: Require the reviewed topology and reserved LAN addresses
+      ansible.builtin.assert:
+        that:
+          - ha_topology_reviewed | bool
+          - dns_wired_address_reserved | bool
+          - ha_virtual_ip | length > 0
+          - ansible_facts.default_ipv4.interface == node_interface
+    - name: Validate the operator-selected VIP against node addresses
+      ansible.builtin.command:
+        argv:
+          - '{{ ansible_playbook_python }}'
+          - -c
+          - >-
+            import ipaddress,sys;
+            vip=ipaddress.IPv4Address(sys.argv[1]);
+            assert vip in ipaddress.IPv4Network('192.168.1.0/24') and str(vip) not in sys.argv[2:]
+          - '{{ ha_virtual_ip }}'
+          - '{{ hostvars.pos.node_ip }}'
+          - '{{ hostvars.optiplex.node_ip }}'
+          - '{{ hostvars.rpi4.node_ip }}'
+          - '192.168.1.0'
+          - '192.168.1.1'
+          - '192.168.1.255'
+      delegate_to: localhost
+      become: false
+      changed_when: false
+    - name: Install native failover and health-check tools on POS
+      ansible.builtin.dnf:
+        name: [keepalived, bind-utils]
+        state: present
+      when: ansible_facts.os_family == 'RedHat'
+    - name: Install native failover and health-check tools on Alpine
+      community.general.apk:
+        name: [keepalived, bind-tools]
+        state: present
+      when: ansible_facts.distribution == 'Alpine'
+    - name: Permit only the other frontend to send unicast VRRP on POS
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: 'rule family="ipv4" source address="{{ hostvars.rpi4.node_ip }}/32" protocol value="vrrp" accept'
+        immediate: true
+        permanent: true
+        state: enabled
+      when: inventory_hostname == 'pos'
+    - name: Permit private LAN API access to the shared address on POS
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: 'rule family="ipv4" source address="192.168.1.0/24" destination address="{{ ha_virtual_ip }}/32" port port="6443" protocol="tcp" accept'
+        immediate: true
+        permanent: true
+        state: enabled
+      when: inventory_hostname == 'pos'
+    - name: Forward shared-address DNS to the existing POS Quadlet listener
+      ansible.posix.firewalld:
+        zone: public
+        rich_rule: >-
+          rule family="ipv4" source address="192.168.1.0/24"
+          destination address="{{ ha_virtual_ip }}/32"
+          forward-port port="53" protocol="{{ item }}" to-port="5353" to-addr="{{ node_ip }}"
+        immediate: true
+        permanent: true
+        state: enabled
+      loop: [tcp, udp]
+      when: inventory_hostname == 'pos'
+    - name: Install a health check for both services behind the shared IP
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/homelab-ha-health
+        owner: root
+        group: root
+        mode: '0700'
+        content: |
+          #!/bin/sh
+          set -eu
+          /usr/local/bin/k3s kubectl --request-timeout=2s get --raw=/readyz >/dev/null
+          test -n "$(dig +time=1 +tries=1 +short @{{ node_ip }} -p 5353 pelican.home.internal)"
+    - name: Install the unicast failover configuration
+      ansible.builtin.template:
+        src: keepalived.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+        mode: '0600'
+        validate: /usr/sbin/keepalived --config-test --use-file=%s
+      register: ha_keepalived
+    - name: Require local API and DNS health before advertising the VIP
+      ansible.builtin.command: /usr/local/sbin/homelab-ha-health
+      changed_when: false
+    - name: Enable and converge the frontend failover service
+      ansible.builtin.service:
+        name: keepalived
+        enabled: true
+        state: '{{ "restarted" if ha_keepalived.changed else "started" }}'

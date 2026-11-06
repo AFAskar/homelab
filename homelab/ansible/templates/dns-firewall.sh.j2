@@ -1,0 +1,50 @@
+#!/bin/sh
+# Transactions replace only the DNS replica's chains; k3s rules stay intact.
+set -eu
+rules=$(mktemp)
+trap 'rm -f "$rules"' EXIT HUP INT TERM
+{
+  echo '*nat'
+  echo ':HOMELAB-DNS-NAT - [0:0]'
+  echo '-F HOMELAB-DNS-NAT'
+{% if ha_virtual_ip | default('') | length > 0 %}
+  for protocol in tcp udp; do
+    echo "-A HOMELAB-DNS-NAT -d {{ ha_virtual_ip }}/32 -p $protocol --dport 53 -j DNAT --to-destination {{ node_ip }}:5353"
+  done
+  if ! iptables -w -t nat -C PREROUTING -d {{ ha_virtual_ip }}/32 -j HOMELAB-DNS-NAT 2>/dev/null; then
+    echo '-I PREROUTING 1 -d {{ ha_virtual_ip }}/32 -j HOMELAB-DNS-NAT'
+  fi
+{% endif %}
+  for protocol in tcp udp; do
+    echo "-A HOMELAB-DNS-NAT -p $protocol --dport 53 -j REDIRECT --to-ports 5353"
+  done
+  if ! iptables -w -t nat -C PREROUTING -d {{ node_ip }}/32 -j HOMELAB-DNS-NAT 2>/dev/null; then
+    echo '-I PREROUTING 1 -d {{ node_ip }}/32 -j HOMELAB-DNS-NAT'
+  fi
+  echo COMMIT
+} > "$rules"
+iptables-restore --wait --noflush < "$rules"
+{
+  echo '*filter'
+  echo ':HOMELAB-DNS-IN - [0:0]'
+  echo '-F HOMELAB-DNS-IN'
+  echo '-A HOMELAB-DNS-IN -i {{ node_interface }} -s {{ hostvars.pos.node_ip }}/32 -p vrrp -j ACCEPT'
+  echo '-A HOMELAB-DNS-IN -s 192.168.1.0/24 -p tcp -m multiport --dports 53,5353,3000 -j ACCEPT'
+  echo '-A HOMELAB-DNS-IN -s 192.168.1.0/24 -p udp -m multiport --dports 53,5353 -j ACCEPT'
+  echo '-A HOMELAB-DNS-IN -s 10.42.0.0/16 -p tcp -m multiport --dports 53,5353 -j ACCEPT'
+  echo '-A HOMELAB-DNS-IN -s 10.42.0.0/16 -p udp -m multiport --dports 53,5353 -j ACCEPT'
+  echo '-A HOMELAB-DNS-IN -p tcp -m multiport --dports 53,5353,3000 -j DROP'
+  echo '-A HOMELAB-DNS-IN -p udp -m multiport --dports 53,5353 -j DROP'
+  echo '-A HOMELAB-DNS-IN -j RETURN'
+  if ! iptables -w -C INPUT -d {{ node_ip }}/32 -j HOMELAB-DNS-IN 2>/dev/null; then
+    echo '-I INPUT 1 -d {{ node_ip }}/32 -j HOMELAB-DNS-IN'
+  fi
+  echo COMMIT
+} > "$rules"
+iptables-restore --wait --noflush < "$rules"
+{% if ha_virtual_ip | default('') | length > 0 %}
+iptables -w -C INPUT -i {{ node_interface }} -s {{ hostvars.pos.node_ip }}/32 -p vrrp -j ACCEPT 2>/dev/null ||
+  iptables -w -I INPUT 1 -i {{ node_interface }} -s {{ hostvars.pos.node_ip }}/32 -p vrrp -j ACCEPT
+iptables -w -C INPUT -d {{ ha_virtual_ip }}/32 -s 192.168.1.0/24 -p tcp --dport 6443 -j ACCEPT 2>/dev/null ||
+  iptables -w -I INPUT 1 -d {{ ha_virtual_ip }}/32 -s 192.168.1.0/24 -p tcp --dport 6443 -j ACCEPT
+{% endif %}

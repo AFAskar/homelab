@@ -1,0 +1,22 @@
+auto lo
+iface lo inet loopback
+iface lo inet6 loopback
+
+auto eth0
+iface eth0 inet static
+    address {{ node_ip }}/24
+    gateway 192.168.1.1
+    metric 100
+iface eth0 inet6 manual
+    up ip link set $IFACE up
+    down ip link set $IFACE down
+
+# Keep the existing wpa_supplicant credentials and Wi-Fi SSH recovery address.
+auto wlan0
+iface wlan0 inet static
+    address {{ pi_wifi_recovery_address }}/24
+    gateway 192.168.1.1
+    metric 600
+iface wlan0 inet6 manual
+    up ip link set $IFACE up
+    down ip link set $IFACE down

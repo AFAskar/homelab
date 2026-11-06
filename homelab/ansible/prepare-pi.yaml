@@ -1,0 +1,11 @@
+- name: Install Ansible prerequisites without changing the existing cluster
+  hosts: rpi4
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Bootstrap Python and inspection tools on Alpine
+      ansible.builtin.raw: >-
+        apk info -e python3 iproute2 util-linux >/dev/null 2>&1 ||
+        { apk add --no-cache python3 iproute2 util-linux && echo PREREQUISITES_INSTALLED; }
+      register: pi_bootstrap
+      changed_when: "'PREREQUISITES_INSTALLED' in pi_bootstrap.stdout"

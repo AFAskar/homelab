@@ -17,6 +17,15 @@ distro: alpine linux (doas not sudo)
 username: run-barry-run
 ssh config alias : optiplex
 
+## rpi4
+
+Alpine ARM64 Raspberry Pi 4, approximately 4 GB RAM. SSH alias/user: `rpi4`;
+use doas. Wi-Fi recovery: 192.168.1.18; wired interface eth0 currently uses
+192.168.1.23. Reserve the wired address before deployment. Host automation and
+the proposed POS/Optiplex/rpi4 three-server topology are in `homelab/ansible/`.
+The Pi's existing standalone cluster must be preserved/retired explicitly
+before joining the production cluster; see `docs/homelab-ha.md`.
+
 # Rootless Podman services
 
 Use Quadlet for Ansible-managed persistent Podman services. AdGuard is managed

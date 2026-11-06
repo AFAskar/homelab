@@ -15,4 +15,6 @@ however you still need to write the manifests yourself
 
 Cluster rebuild and PKI procedures are documented in [`docs/`](docs/).
 
+Three-server control-plane and dual-resolver setup: [`docs/homelab-ha.md`](docs/homelab-ha.md).
+
 OCI infrastructure implementation and deployment status: [`oci/README.md`](oci/README.md).

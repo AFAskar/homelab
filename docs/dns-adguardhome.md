@@ -4,6 +4,10 @@ AdGuard runs on pos as the rootless systemd user service `adguardhome.service`.
 Ansible installs its Quadlet, encrypted configuration, persistent directories
 and DNS firewall rules.
 
+For a second native resolver on the Alpine Pi and staged LAN failover, follow
+[homelab HA setup](homelab-ha.md). The existing POS deployment remains the
+authoritative rootless Quadlet entrypoint.
+
 ## Deploy
 
 Prerequisites: SSH/sudo access to pos, Ansible, SOPS, dig and the repository's
