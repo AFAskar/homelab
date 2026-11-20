@@ -1,0 +1,35 @@
+#!/sbin/openrc-run
+description="Forward tailnet DNS to the native homelab resolver"
+
+depend() {
+    need tailscale homelab-dns-firewall
+}
+
+dns_nat_rule() {
+    iptables -w -t nat "$1" PREROUTING -i tailscale0 -d 100.64.0.0/10 \
+        -m addrtype --dst-type LOCAL -p "$2" --dport 53 \
+        -j DNAT --to-destination {{ node_ip }}:5353
+}
+
+dns_input_rule() {
+    iptables -w "$1" INPUT -i tailscale0 -d {{ node_ip }}/32 -p "$2" \
+        --dport 5353 -m conntrack --ctstate DNAT --ctorigdstport 53 -j ACCEPT
+}
+
+start() {
+    for protocol in tcp udp; do
+        dns_input_rule -C "$protocol" 2>/dev/null || dns_input_rule -I "$protocol" || return 1
+        dns_nat_rule -C "$protocol" 2>/dev/null || dns_nat_rule -I "$protocol" || return 1
+    done
+}
+
+stop() {
+    for protocol in tcp udp; do
+        if dns_nat_rule -C "$protocol" 2>/dev/null; then
+            dns_nat_rule -D "$protocol" || return 1
+        fi
+        if dns_input_rule -C "$protocol" 2>/dev/null; then
+            dns_input_rule -D "$protocol" || return 1
+        fi
+    done
+}

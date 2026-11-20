@@ -170,7 +170,8 @@
         "autogroup:member"
       ],
       "dst": [
-        "pos"
+        "pos",
+        "tag:homelab-dns"
       ],
       "ip": [
         "tcp:53",
@@ -383,10 +384,13 @@
       "src": "owner-phone",
       "proto": "tcp",
       "accept": [
-        "pos:53"
+        "pos:53",
+        "tag:homelab-dns:53"
       ],
       "deny": [
         "pos:22",
+        "tag:homelab-dns:22",
+        "tag:homelab-dns:3000",
         "lab-host:3389"
       ]
     },
@@ -394,15 +398,20 @@
       "src": "owner-phone",
       "proto": "udp",
       "accept": [
-        "pos:53"
+        "pos:53",
+        "tag:homelab-dns:53"
       ],
       "deny": [
         "pos:5353",
+        "tag:homelab-dns:5353",
         "wings-04-private:8080"
       ]
     }
   ],
   "tagOwners": {
+    "tag:homelab-dns": [
+      "group:homelab-owner"
+    ],
     "tag:oci-router": [
       "group:homelab-owner"
     ]

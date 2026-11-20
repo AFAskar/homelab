@@ -115,9 +115,45 @@ kubectl -n argocd edit application homelab
 ```
 
 Configure LAN clients or DHCP DNS options to use the shared address after checks
-pass. Do not advertise a public resolver as fallback for private names. The
-LAN VIP is not a Tailscale subnet route; remote DNS/API failover requires the
-Pi's actual tailnet address and scoped policy/split-DNS configuration separately.
+pass. Do not advertise a public resolver as fallback for private names.
+
+## Tailnet split DNS
+
+Deploy the native Pi resolver first. Review and apply the
+`tailscale_acl.tailnet` change defining `tag:homelab-dns` before enrolling
+the device. The grant allows tailnet members to query TCP and UDP port 53.
+Follow the [tailnet policy procedure](../oci/docs/operations.md) for plan review.
+
+Generate a one-time, non-ephemeral Tailscale auth key for
+`tag:homelab-dns` and save it in a private local file. From the repository
+root, run:
+
+```sh
+ansible-playbook -i homelab/ansible/inventory.yaml homelab/ansible/dns-tailnet.yaml \
+  -e dns_tailnet_auth_key_file=/private/path/to/one-time-key
+ssh rpi4 'doas -n tailscale ip -4'
+```
+
+The enrollment uses hostname `rpi4-dns` and leaves the Pi's host DNS
+configuration in place. Approve the device if the tailnet requires it.
+Remove the one-time key file after enrollment. Test the Pi's tailnet address
+from a member device using both transports before changing split DNS:
+
+```sh
+dig @PI_TAILNET_IP pelican.home.internal
+dig +tcp @PI_TAILNET_IP pelican.home.internal
+dig @PI_TAILNET_IP wings-01.oci.home.internal
+```
+
+Use a Terraform credential with DNS write access and device read access to plan
+and apply `tailscale_dns_split_nameservers.home_internal`. The import block
+adopts the existing split DNS entry. Review the plan for the two resolver
+addresses on `home.internal`. After applying, check `tailscale dns status` and
+resolve both names using the client's normal lookup path. Test resolver failover
+by stopping POS AdGuard, checking both lookups from a tailnet client, then
+restoring POS and checking it directly. Repeat with the Pi resolver stopped.
+Tailnet Kubernetes API access and application availability depend on their own
+endpoints and access policy.
 
 ## Checks and recovery
 
