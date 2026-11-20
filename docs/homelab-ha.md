@@ -119,10 +119,23 @@ pass. Do not advertise a public resolver as fallback for private names.
 
 ## Tailnet split DNS
 
-Deploy the native Pi resolver first. Review and apply the
-`tailscale_acl.tailnet` change defining `tag:homelab-dns` before enrolling
-the device. The grant allows tailnet members to query TCP and UDP port 53.
-Follow the [tailnet policy procedure](../oci/docs/operations.md) for plan review.
+Deploy the native Pi resolver first. Follow the
+[tailnet policy procedure](../oci/docs/operations.md) and load the Terraform
+credential. The full root looks up the enrolled Pi, so bootstrap the DNS tag
+with a policy-only plan. From the repository root:
+
+```sh
+umask 077
+terraform -chdir=oci/terraform plan -target=tailscale_acl.tailnet -out=tailnet-dns-bootstrap.tfplan
+terraform -chdir=oci/terraform show tailnet-dns-bootstrap.tfplan
+```
+
+Confirm that the plan only adds the DNS tag and its scoped TCP and UDP port 53
+grant and policy tests. Apply the reviewed plan before enrolling the Pi:
+
+```sh
+terraform -chdir=oci/terraform apply tailnet-dns-bootstrap.tfplan
+```
 
 Generate a one-time, non-ephemeral Tailscale auth key for
 `tag:homelab-dns` and save it in a private local file. From the repository
@@ -145,8 +158,9 @@ dig +tcp @PI_TAILNET_IP pelican.home.internal
 dig @PI_TAILNET_IP wings-01.oci.home.internal
 ```
 
-Use a Terraform credential with DNS write access and device read access to plan
-and apply `tailscale_dns_split_nameservers.home_internal`. The import block
+After enrollment and the direct DNS checks, resume full-root planning with a
+Terraform credential with policy access, DNS write access, and device read
+access. Review the split DNS change before applying it. The import block
 adopts the existing split DNS entry. Review the plan for the two resolver
 addresses on `home.internal`. After applying, check `tailscale dns status` and
 resolve both names using the client's normal lookup path. Test resolver failover
