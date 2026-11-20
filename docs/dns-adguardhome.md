@@ -67,6 +67,12 @@ firewalld redirects before changing the application configuration. Compare
 `dig @192.168.1.28 -p 5353 github.com` with the port-53 query to distinguish the
 container listener from host forwarding. Preserve logs privately.
 
+If Podman reports a runtime error during startup, check
+`ssh pos 'podman info --format "{{.Store.GraphRoot}} {{.Store.RunRoot}}"'`.
+The deployment configures and verifies POS's existing rootless storage paths.
+For storage-only recovery, run the deployment with `--tags podman_storage`,
+then check AdGuard and rerun the full deployment.
+
 ## Change settings or addresses
 
 ```bash
