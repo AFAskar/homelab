@@ -1,0 +1,83 @@
+# Run after dns-secondary.yaml has provisioned the LAN resolver.
+- name: Expose the Alpine resolver to Tailscale clients
+  hosts: dns_secondary
+  become: true
+  tasks:
+    - name: Require the provisioned native resolver
+      ansible.builtin.stat:
+        path: /etc/init.d/adguardhome
+      register: dns_tailnet_resolver
+    - name: Require Alpine and its existing resolver
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Alpine'
+          - dns_tailnet_resolver.stat.exists
+          - node_ip in ansible_facts.all_ipv4_addresses
+    - name: Install the Tailscale OpenRC service
+      community.general.apk:
+        name: [tailscale, tailscale-openrc]
+        state: present
+    - name: Load the TUN module for Tailscale
+      community.general.modprobe:
+        name: tun
+        state: present
+        persistent: present
+    - name: Enable the Tailscale daemon
+      ansible.builtin.service:
+        name: tailscale
+        enabled: true
+        state: started
+    - name: Read Tailscale enrollment state
+      ansible.builtin.command:
+        argv: [tailscale, status, --json]
+      register: dns_tailnet_status
+      changed_when: false
+      failed_when: dns_tailnet_status.rc not in [0, 1]
+      no_log: true
+    - name: Enroll the resolver when a one-time key is supplied
+      when:
+        - (dns_tailnet_status.stdout | from_json).BackendState == 'NeedsLogin'
+        - dns_tailnet_auth_key_file is defined
+      block:
+        - name: Create a private temporary key file
+          ansible.builtin.tempfile:
+            state: file
+          register: dns_tailnet_key
+        - name: Stage the one-time tagged key
+          ansible.builtin.copy:
+            src: "{{ dns_tailnet_auth_key_file }}"
+            dest: "{{ dns_tailnet_key.path }}"
+            mode: '0600'
+          no_log: true
+        - name: Enroll the Pi with the DNS-only server tag
+          ansible.builtin.command:
+            argv:
+              - tailscale
+              - up
+              - '--auth-key=file:{{ dns_tailnet_key.path }}'
+              - --hostname=rpi4-dns
+              - --advertise-tags=tag:homelab-dns
+              - --accept-dns=false
+              - --timeout=60s
+          changed_when: true
+          no_log: true
+      always:
+        - name: Remove the staged enrollment key
+          ansible.builtin.file:
+            path: "{{ dns_tailnet_key.path }}"
+            state: absent
+          when: dns_tailnet_key.path is defined
+    - name: Install DNS forwarding scoped to the Tailscale interface
+      ansible.builtin.template:
+        src: dns-tailnet.openrc.j2
+        dest: /etc/init.d/homelab-dns-tailnet
+        owner: root
+        group: root
+        mode: '0755'
+        validate: /bin/sh -n %s
+      register: dns_tailnet_service
+    - name: Enable and apply tailnet DNS forwarding
+      ansible.builtin.service:
+        name: homelab-dns-tailnet
+        enabled: true
+        state: "{{ 'restarted' if dns_tailnet_service.changed else 'started' }}"

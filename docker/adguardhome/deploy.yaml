@@ -74,6 +74,36 @@
       ansible.builtin.command: loginctl enable-linger pos
       when: adguard_linger.stdout != 'yes'
       changed_when: true
+    - name: Configure and verify the existing rootless Podman store
+      tags: [podman_storage]
+      block:
+        - name: Ensure the rootless Podman configuration directory
+          ansible.builtin.file:
+            path: /home/pos/.config/containers
+            state: directory
+            mode: '0700'
+        - name: Preserve rootless storage paths across Podman upgrades
+          ansible.builtin.copy:
+            dest: /home/pos/.config/containers/storage.conf
+            content: |
+              [storage]
+              driver = "overlay"
+              graphroot = "/home/pos/.local/share/containers/storage"
+              runroot = "/run/user/{{ ansible_facts.user_uid }}/containers"
+            force: false
+            mode: '0600'
+        - name: Check that Podman can open the existing rootless store
+          ansible.builtin.command:
+            argv: [podman, info, --format, json]
+          environment: "{{ adguard_systemd_environment }}"
+          register: adguard_podman_info
+          changed_when: false
+        - name: Verify the rootless graph and run directories
+          ansible.builtin.assert:
+            that:
+              - (adguard_podman_info.stdout | from_json).host.security.rootless
+              - (adguard_podman_info.stdout | from_json).store.graphRoot == '/home/pos/.local/share/containers/storage'
+              - (adguard_podman_info.stdout | from_json).store.runRoot == '/run/user/' ~ ansible_facts.user_uid ~ '/containers'
     - name: Ensure persistent directories without touching existing data
       ansible.builtin.file:
         path: "{{ item }}"

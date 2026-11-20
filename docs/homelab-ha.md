@@ -115,9 +115,59 @@ kubectl -n argocd edit application homelab
 ```
 
 Configure LAN clients or DHCP DNS options to use the shared address after checks
-pass. Do not advertise a public resolver as fallback for private names. The
-LAN VIP is not a Tailscale subnet route; remote DNS/API failover requires the
-Pi's actual tailnet address and scoped policy/split-DNS configuration separately.
+pass. Do not advertise a public resolver as fallback for private names.
+
+## Tailnet split DNS
+
+Deploy the native Pi resolver first. Follow the
+[tailnet policy procedure](../oci/docs/operations.md) and load the Terraform
+credential. The full root looks up the enrolled Pi, so bootstrap the DNS tag
+with a policy-only plan. From the repository root:
+
+```sh
+umask 077
+terraform -chdir=oci/terraform plan -target=tailscale_acl.tailnet -out=tailnet-dns-bootstrap.tfplan
+terraform -chdir=oci/terraform show tailnet-dns-bootstrap.tfplan
+```
+
+Confirm that the plan only adds the DNS tag and its scoped TCP and UDP port 53
+grant and policy tests. Apply the reviewed plan before enrolling the Pi:
+
+```sh
+terraform -chdir=oci/terraform apply tailnet-dns-bootstrap.tfplan
+```
+
+Generate a one-time, non-ephemeral Tailscale auth key for
+`tag:homelab-dns` and save it in a private local file. From the repository
+root, run:
+
+```sh
+ansible-playbook -i homelab/ansible/inventory.yaml homelab/ansible/dns-tailnet.yaml \
+  -e dns_tailnet_auth_key_file=/private/path/to/one-time-key
+ssh rpi4 'doas -n tailscale ip -4'
+```
+
+The enrollment uses hostname `rpi4-dns` and leaves the Pi's host DNS
+configuration in place. Approve the device if the tailnet requires it.
+Remove the one-time key file after enrollment. Test the Pi's tailnet address
+from a member device using both transports before changing split DNS:
+
+```sh
+dig @PI_TAILNET_IP pelican.home.internal
+dig +tcp @PI_TAILNET_IP pelican.home.internal
+dig @PI_TAILNET_IP wings-01.oci.home.internal
+```
+
+After enrollment and the direct DNS checks, resume full-root planning with a
+Terraform credential with policy access, DNS write access, and device read
+access. Review the split DNS change before applying it. The import block
+adopts the existing split DNS entry. Review the plan for the two resolver
+addresses on `home.internal`. After applying, check `tailscale dns status` and
+resolve both names using the client's normal lookup path. Test resolver failover
+by stopping POS AdGuard, checking both lookups from a tailnet client, then
+restoring POS and checking it directly. Repeat with the Pi resolver stopped.
+Tailnet Kubernetes API access and application availability depend on their own
+endpoints and access policy.
 
 ## Checks and recovery
 

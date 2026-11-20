@@ -11,3 +11,41 @@ resource "tailscale_acl" "tailnet" {
     prevent_destroy = true
   }
 }
+
+data "tailscale_device" "homelab_dns_replica" {
+  hostname = "rpi4-dns"
+}
+
+locals {
+  dns_replica_ipv4 = [
+    for address in data.tailscale_device.homelab_dns_replica.addresses : address
+    if can(cidrnetmask("${address}/32"))
+  ]
+}
+
+import {
+  to = tailscale_dns_split_nameservers.home_internal
+  id = "home.internal"
+}
+
+resource "tailscale_dns_split_nameservers" "home_internal" {
+  domain = "home.internal"
+  nameservers = [
+    jsondecode(file("${path.module}/../ansible/tailscale/policy.hujson")).hosts.pos,
+    try(one(local.dns_replica_ipv4), null),
+  ]
+
+  lifecycle {
+    prevent_destroy = true
+
+    precondition {
+      condition = (
+        data.tailscale_device.homelab_dns_replica.authorized &&
+        !data.tailscale_device.homelab_dns_replica.blocks_incoming_connections &&
+        contains(data.tailscale_device.homelab_dns_replica.tags, "tag:homelab-dns") &&
+        length(local.dns_replica_ipv4) == 1
+      )
+      error_message = "Enroll and authorize rpi4-dns with tag:homelab-dns, inbound connections enabled, and one tailnet IPv4 address before applying split DNS."
+    }
+  }
+}
