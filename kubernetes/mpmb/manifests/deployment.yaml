@@ -30,13 +30,25 @@ spec:
           command:
             - /bin/sh
             - -ec
-            - chown -R 1000:1000 /data/sheets && chmod 0750 /data/sheets
+            - |
+              chown -R 1000:1000 /data/sheets
+              chmod 0750 /data/sheets
+              cp /etc/mpmb-git-secret/id_ed25519 /etc/mpmb-git/id_ed25519
+              cp /etc/mpmb-git-secret/known_hosts /etc/mpmb-git/known_hosts
+              chown 1000:1000 /etc/mpmb-git/id_ed25519 /etc/mpmb-git/known_hosts
+              chmod 0400 /etc/mpmb-git/id_ed25519
+              chmod 0444 /etc/mpmb-git/known_hosts
           securityContext:
             runAsUser: 0
             allowPrivilegeEscalation: false
           volumeMounts:
             - name: sheets
               mountPath: /data/sheets
+            - name: git-ssh-secret
+              mountPath: /etc/mpmb-git-secret
+              readOnly: true
+            - name: git-ssh-runtime
+              mountPath: /etc/mpmb-git
       containers:
         - name: mpmb-reader
           image: ghcr.io/afaskar/mpmpacrobatlinux:sha-ca484b7@sha256:13e9d9d2ed1c1c88b60ec38e3d2b2f9b463fa6e289d221dba4c7294f47b4fa6c
@@ -59,6 +71,18 @@ spec:
               value: "0.0.0.0:8080"
             - name: MPMB_DATA_DIR
               value: "/data/sheets"
+            - name: MPMB_GIT_REPO
+              value: "git@github.com:AFAskar/mpmb-characters.git"
+            - name: MPMB_GIT_BRANCH
+              value: "main"
+            - name: MPMB_GIT_SSH_KEY
+              value: "/etc/mpmb-git/id_ed25519"
+            - name: MPMB_GIT_KNOWN_HOSTS
+              value: "/etc/mpmb-git/known_hosts"
+            - name: MPMB_GIT_AUTHOR_NAME
+              value: "MPMB Reader"
+            - name: MPMB_GIT_AUTHOR_EMAIL
+              value: "mpmb-reader@home.internal"
             - name: MPMB_GIT_AUTO_SYNC_SECS
               value: "300"
             - name: MPMB_ALLOW_UNAUTHENTICATED
@@ -68,6 +92,9 @@ spec:
               mountPath: /data/sheets
             - name: tmp
               mountPath: /tmp
+            - name: git-ssh-runtime
+              mountPath: /etc/mpmb-git
+              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -93,3 +120,9 @@ spec:
             claimName: mpmb-sheets
         - name: tmp
           emptyDir: {}
+        - name: git-ssh-secret
+          secret:
+            secretName: mpmb-git-ssh
+        - name: git-ssh-runtime
+          emptyDir:
+            medium: Memory
