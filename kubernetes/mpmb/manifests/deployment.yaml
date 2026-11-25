@@ -61,15 +61,8 @@ spec:
               value: "/data/sheets"
             - name: MPMB_GIT_AUTO_SYNC_SECS
               value: "300"
-            - name: MPMB_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: mpmb-config
-                  key: MPMB_AUTH_TOKEN
-                  optional: false
-          envFrom:
-            - secretRef:
-                name: mpmb-config
+            - name: MPMB_ALLOW_UNAUTHENTICATED
+              value: "1"
           volumeMounts:
             - name: sheets
               mountPath: /data/sheets
