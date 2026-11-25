@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: volume-permissions
-          image: ghcr.io/afaskar/mpmpacrobatlinux:sha-ca484b7@sha256:13e9d9d2ed1c1c88b60ec38e3d2b2f9b463fa6e289d221dba4c7294f47b4fa6c
+          image: ghcr.io/afaskar/mpmpacrobatlinux:sha-ddc0f4f@sha256:304f78df8e357a472b9d5ab4e3a693c5e06e82a9353356648fb6dfa0f55c02e6
           command:
             - /bin/sh
             - -ec
@@ -51,7 +51,7 @@ spec:
               mountPath: /etc/mpmb-git
       containers:
         - name: mpmb-reader
-          image: ghcr.io/afaskar/mpmpacrobatlinux:sha-ca484b7@sha256:13e9d9d2ed1c1c88b60ec38e3d2b2f9b463fa6e289d221dba4c7294f47b4fa6c
+          image: ghcr.io/afaskar/mpmpacrobatlinux:sha-ddc0f4f@sha256:304f78df8e357a472b9d5ab4e3a693c5e06e82a9353356648fb6dfa0f55c02e6
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
