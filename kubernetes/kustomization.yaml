@@ -11,3 +11,4 @@ resources:
   - cert-manager/cert-manager-conf.yaml
   - homepage/homepage.yaml
   - pelican/pelican.yaml
+  - mpmb/mpmb.yaml

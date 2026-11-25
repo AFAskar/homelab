@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mpmb-reader
+  labels:
+    app.kubernetes.io/name: mpmb-reader
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: MPMB Reader
+    gethomepage.dev/group: Apps
+    gethomepage.dev/description: MPMB Character Sheet Reader
+    gethomepage.dev/icon: mdi-dice-d20
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - mpmb.home.internal
+  rules:
+    - host: mpmb.home.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mpmb-reader
+                port:
+                  name: http
